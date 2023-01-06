@@ -1,22 +1,4 @@
-# Lux-GI
-
-Hybrid GI solution, based on DDGI ( include  Ray-Tracing and SDF-Tracing )
-
-Code and Document is working in progress
-
-![Overview](./images/overview.png)
-
-## Showcase
-
-[bilibili](https://www.bilibili.com/video/BV1NM411y7sv/)
-[youtuebe](https://www.youtube.com/watch?v=RfRbWnsdwx0)
-
-## Document
-
-[English-Version](./English.md)
-[中文版](./Chinese.md)
-
-## 介绍
+# 介绍
 
 该项目为一套Hybrid GI 方案，其中部分灵感来自于Lumen和DDGI. 主要的核心出发点为，提供一套完整的GI方案（包含Indirect-Light, Infinite-Bounce, Emissive-Lighting, Glossy-Reflection, Shadow, AO)，能同时运行在Raytracing支持和没有光线追踪的硬件上. 由于时间仓促，本项目还存在部分性能问题，但是作为抛砖引玉，相信能给大部分对GI感兴趣的朋友提供一些新的思路。
 
@@ -243,4 +225,3 @@ Spatiotemporal Variance-Guided Filtering
 [知乎](https://zhuanlan.zhihu.com/p/28288053)
 
 ## 环境光遮蔽（未实现）
-
