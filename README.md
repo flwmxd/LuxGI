@@ -1,22 +1,4 @@
-# Lux-GI
-
-Hybrid GI solution, based on DDGI ( include  Ray-Tracing and SDF-Tracing )
-
-Code and Document is working in progress
-
-![Overview](./images/overview.png)
-
-## Showcase
-
-[bilibili](https://www.bilibili.com/video/BV1NM411y7sv/)
-[youtuebe](https://www.youtube.com/watch?v=RfRbWnsdwx0)
-
-## Document
-
-[English-Version](./English.md)
-[中文版](./Chinese.md)
-
-## 介绍
+# 介绍
 
 该项目为一套Hybrid GI 方案，其中部分灵感来自于Lumen和DDGI. 主要的核心出发点为，提供一套完整的GI方案（包含Indirect-Light, Infinite-Bounce, Emissive-Lighting, Glossy-Reflection, Shadow, AO)，能同时运行在Raytracing支持和没有光线追踪的硬件上. 由于时间仓促，本项目还存在部分性能问题，但是作为抛砖引玉，相信能给大部分对GI感兴趣的朋友提供一些新的思路。
 
@@ -70,8 +52,8 @@ Step2. 当获取到Radiance和Depth之后，更新探针，即使用Radiance贴�
 Step3. 边界进行更新
 
 因为DDGI使用了双线性插值，因此对于边界需要进行特殊的操作。如图所示：
-![Border](./images/update-border.png)
 
+![Border](./images/update-border.png)
 
 Step4. 对每一帧每一个像素使用其邻近的8个探针进行采样。
 值得注意项， 在使用探针进行采样的时候，我们需要进行可见性测试，以防止漏光的问题。
@@ -82,7 +64,7 @@ Step4. 对每一帧每一个像素使用其邻近的8个探针进行采样。
 ![Visibility](./images/Visibility-check.png)
 
 
-在上文中，我们知道在每次进行光线追踪的时候，存储的当前光线所击中的距离信息 $d$ 以及距离的平方 $d^2$，因此我们可以使用$d$和$d^2$进行可见性测试
+在上文中，我们知道在每次进行光线追踪的时候，存储的当前光线所击中的距离信息 $d$ 以及距离的平方 $d^2$，因此我们可以使用 $d$ 和 $d^2$ 进行可见性测试
 
 在此处我们引入切比雪夫不等式：
 
@@ -181,8 +163,6 @@ Lumen 实现的[Surface Cache](https://docs.unrealengine.com/5.0/en-US/lumen-tec
 
 3. 如果不平行于当前面，则尝试进行采样。因为SDF求交之后存在精度问题，因此采样时，我们获取到当前击中点的周围的4个点进行一次双线性插值来保证采样的正确性。
 
-
-
 ### 光照
 
 #### 直接光照
@@ -231,10 +211,24 @@ SDF可以的支持软阴影效果，但是由于GlobalSDF的精度问题，目�
 
 ## 降噪
 
-目前对于实时光线追踪的算法基本上都是基于一次采样+降噪的方式，在本算法中，降噪器主要应用在Glossy反射和软阴影上
+目前对于实时光线追踪的算法基本上都是基于一次采样+降噪的方式，在本算法中，降噪器主要应用在Glossy反射和软阴影上。
 
 ![denoise](./images/reflection-denoise.png)
 
+### 高斯滤波 Gaussian Filtering
+
+高斯滤波是一种低通滤波器（其核心为求滤波核中的平均值），滤波完成之后的结果即为低频信息，因此过滤出来的结果会出现整个画面模糊的情况。但是对于游戏的一些画面来说，低通滤波是不完美的。[参考文献](http://rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/)
+
+### 双边滤波 Bilateral Filtering
+
+由于高斯滤波是一种低通滤波器，对于信号变化比较大的图像则无法很好的保持其边界。因此我们可以使用双边滤波的方式对图像进行处理。双边滤波中，一个重要的参考值为当前的像素的亮度的变化量作为权值，即亮度变化大权重则小。[参考文献](https://en.wikipedia.org/wiki/Bilateral_filter)
+
+
+![Bilateral](./images/filter.jpg)
+
+### 联合双边滤波 Joint Bilateral Filtering
+
+在高斯滤波中，我们考虑了像素之间的距离作为贡献权重, 双边滤波当中考虑了像素的亮度。在实时渲染当中我们可以使用GBuffer指导滤波，如果考虑的更多的因素（例如深度，法线features等）我们称之为联合双边滤波。
 
 ### SVGF
 
@@ -242,5 +236,64 @@ Spatiotemporal Variance-Guided Filtering
 [NVIDA-Link](https://research.nvidia.com/publication/2017-07_spatiotemporal-variance-guided-filtering-real-time-reconstruction-path-traced) 
 [知乎](https://zhuanlan.zhihu.com/p/28288053)
 
-## 环境光遮蔽（未实现）
+在当前GI的算法中我们选择了SVGF进行降噪处理，SVGF是一个运行在Spatial和Temporal的降噪算法，使用联合双边滤波，同时加入了方差分析和其他一些特性。
 
+在SVGF中我们使用了一个[Atrous](https://jo.dreggn.org/home/2010_atrous.pdf)进行滤波操作。
+
+#### Spatial滤波
+
+在空间过滤部分，SVGF使用了À-Trous wavelet filter，同时使用了渐进式的增大Filter的大小降低计算资源的开销，如图所示：
+
+![SVGF-Depth](./images/SVGF-Spatial.jpg)
+
+```c++
+for (int yy = -RADIUS; yy <= RADIUS; yy++)
+{
+    for (int xx = -RADIUS; xx <= RADIUS; xx++)
+    {
+        const ivec2 coord = coord + ivec2(xx, yy) * STEP_SIZE; 
+        // Edge stop....
+    }
+}
+```
+
+##### 深度处理
+
+![SVGF-Depth](./images/SVGF-Depth.png)
+
+在Atrous中，我们首先考虑深度因素，如图A/B, 因为AB在同一个面上，因此在过滤的过程中，AB应该相互贡献，但是AB的深度有差异，因此对于深度的处理，我们会更加偏向于使用深度的梯度进行操作。
+
+##### 法线处理
+
+其次我们考虑法线对降噪的影响
+
+![SVGF-Normal](./images/SVGF-Normal.png)
+
+如图所示，如果AB两点的夹角越小，说明两个点的方向可能存在一直性，因此$ W_n $的值更加趋近与1
+
+##### 颜色处理
+
+![SVGF-Color](./images/SVGF-Color.png)
+
+颜色对于权重的贡献主要体现在颜色亮度的变化即Luminance，但是由于噪声的存在，可能获取的到的某个点的原色不是很准确，因此我们可以通过方差来修正这个问题。
+
+#### Temporal滤波
+
+在时间上的滤波主要是复用上一帧的信息，在这种情况下我们可以认为增加了当前像素的采样次数。
+
+为了合理的获取上一帧像素的信息，我们使用的Motion Vector的方法记录了摄像机移动的方向，因此在当前帧中，可以通过Motion Vector映射回上一帧的具体像素。
+
+##### 法线处理
+
+主要检查当两个点的夹角是否小于特定的阈值，法线的判断可以使用如下公式
+
+$ Fn = |dot(n(a),n(b))| - T  （T为阈值）$
+
+如果当前的Fn大于0，则说明两个点不在一个平面上，丢弃当前的点。
+
+##### MeshID
+
+因为在这个阶段我们可以使用GBuffer的信息，因此可以获取到对应点的MeshID信息，如果A/B两点的MeshID不一致，则丢弃该点。
+
+
+## 环境光遮蔽（TODO..）
