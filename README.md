@@ -1,3 +1,24 @@
+# Lux-GI
+
+Hybrid GI solution, based on DDGI ( include  Ray-Tracing and SDF-Tracing )
+
+Code and Document is working in progress
+
+![Overview](./images/overview.png)
+
+## Showcase
+
+[bilibili](https://www.bilibili.com/video/BV1NM411y7sv/)
+
+[youtuebe](https://www.youtube.com/watch?v=RfRbWnsdwx0)
+
+## Document
+
+[English-Version](./English.md)
+
+[中文版](./Chinese.md)
+
+
 # 介绍
 
 该项目为一套Hybrid GI 方案，其中部分灵感来自于Lumen和DDGI. 主要的核心出发点为，提供一套完整的GI方案（包含Indirect-Light, Infinite-Bounce, Emissive-Lighting, Glossy-Reflection, Shadow, AO)，能同时运行在Raytracing支持和没有光线追踪的硬件上. 由于时间仓促，本项目还存在部分性能问题，但是作为抛砖引玉，相信能给大部分对GI感兴趣的朋友提供一些新的思路。
@@ -70,7 +91,7 @@ Step4. 对每一帧每一个像素使用其邻近的8个探针进行采样。
 
 $P(r > d) \leq \frac{Var}{Var + (d - mean) ^ 2}$
 
-其中 $r$ 是Probe往着色点方向看到最近物体的距离，$d$为着色点和Probe之间的距离， $P(r > d)$ 代表没有遮挡物的概率。
+其中 $r$ 是Probe往着色点方向看到最近物体的距离, $d$ 为着色点和Probe之间的距离， $P(r > d)$ 代表没有遮挡物的概率。
 
 当 $d > mean$时, 我们使用切比雪夫权重，否则直接使用1
 
@@ -287,7 +308,7 @@ for (int yy = -RADIUS; yy <= RADIUS; yy++)
 
 主要检查当两个点的夹角是否小于特定的阈值，法线的判断可以使用如下公式
 
-$ Fn = |dot(n(a),n(b))| - T  （T为阈值）$
+$Fn = |dot(n(a),n(b))| - T $(T为阈值)
 
 如果当前的Fn大于0，则说明两个点不在一个平面上，丢弃当前的点。
 
