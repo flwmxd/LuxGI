@@ -15,9 +15,9 @@ The project is a Hybrid GI solution, partly inspired by Lumen and DDGI. The main
 
 ## Showcase
 
-[bilibili](https://www.bilibili.com/video/BV1NM411y7sv/)
+* [BiliBili](https://www.bilibili.com/video/BV1NM411y7sv/)
 
-[youtuebe](https://www.youtube.com/watch?v=RfRbWnsdwx0)
+* [YouTube](https://www.youtube.com/watch?v=RfRbWnsdwx0)
 
 ## Document
 
