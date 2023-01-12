@@ -1,0 +1,218 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "../Raytraced/Reprojection.glsl"
+#include "ReflectionCommon.glsl"
+
+#define NUM_THREADS_X 8
+#define NUM_THREADS_Y 8
+
+
+layout(local_size_x = NUM_THREADS_X, local_size_y = NUM_THREADS_Y, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba16f)   uniform writeonly image2D outColor;
+layout(set = 0, binding = 1, rgba16f)   uniform writeonly image2D moment;
+
+layout(set = 0, binding = 2)            uniform sampler2D uHistoryOutput;
+layout(set = 0, binding = 3)            uniform sampler2D uHistoryMoments;
+
+layout(set = 0, binding = 4)            uniform sampler2D uInput;
+layout(set = 0, binding = 5)            uniform UniformBufferObject
+{
+    mat4 viewProjInv;
+    mat4 prevViewProj;
+    vec4 cameraPos;
+}ubo;
+
+
+layout(set = 1, binding = 0) uniform sampler2D uColorSampler;
+layout(set = 1, binding = 1) uniform sampler2D uNormalSampler;
+layout(set = 1, binding = 2) uniform sampler2D uDepthSampler;
+layout(set = 1, binding = 3) uniform sampler2D uPBRSampler;
+
+layout(set = 2, binding = 0) uniform sampler2D uPrevColorSampler;
+layout(set = 2, binding = 1) uniform sampler2D uPrevNormalSampler;
+layout(set = 2, binding = 2) uniform sampler2D uPrevDepthSampler;
+layout(set = 2, binding = 3) uniform sampler2D uPrevPBRSampler;
+
+
+layout(set = 3, binding = 0, std430) buffer DenoiseTileData
+{
+    ivec2 coord[];
+}denoiseTileData;
+
+layout(set = 3, binding = 1, std430) buffer DenoiseTileDispatchArgs
+{
+    uint numGroupsX;
+    uint numGroupsY;
+    uint numGroupsZ;
+}denoiseTileDispatchArgs;
+
+layout(set = 3, binding = 2, std430) buffer CopyTileData
+{
+    ivec2 coord[];
+}copyTileData;
+
+layout(set = 3, binding = 3, std430) buffer CopyTileDispatchArgs
+{
+    uint numGroupsX;
+    uint numGroupsY;
+    uint numGroupsZ;
+}copyTileDispatchArgs;
+
+
+layout(push_constant) uniform PushConstants
+{
+    vec3  cameraDelta;
+    float alpha;
+    float momentsAlpha;
+    int   approximateWithDDGI;
+}pushConsts;
+
+
+shared uint gShouldDenoise;
+
+vec3 clipAABB(vec3 aabbMin, vec3 aabbMax, vec3 historySample)
+{
+    vec3 aabbCenter = 0.5f * (aabbMax + aabbMin);
+    vec3 extentClip = 0.5f * (aabbMax - aabbMin) + 0.001f;
+    vec3 colorVector = historySample - aabbCenter;
+    vec3 colorVectorClip = colorVector / extentClip;
+    colorVectorClip  = abs(colorVectorClip);
+    float maxAbsUnit = max(max(colorVectorClip.x, colorVectorClip.y), colorVectorClip.z);
+    if (maxAbsUnit > 1.0)
+        return aabbCenter + colorVector / maxAbsUnit; 
+   return historySample;
+}
+
+
+void neighborhoodStandardDeviation(ivec2 coord, out vec3 mean, out vec3 stdDev)
+{
+    vec3 m1 = vec3(0.0f);
+    vec3 m2 = vec3(0.0f);
+
+    const int radius = 8;
+    const float weight = (float(radius) * 2.0f + 1.0f) * (float(radius) * 2.0f + 1.0f);
+
+    for (int dx = -radius; dx <= radius; dx++)
+    {
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            ivec2 sampleCoord = coord + ivec2(dx, dy);
+            vec3  sampleColor = texelFetch(uInput, sampleCoord, 0).rgb;
+
+            m1 += sampleColor;
+            m2 += sampleColor * sampleColor;
+        }
+    }
+    mean          = m1 / weight;
+    vec3 variance = (m2 / weight) - (mean * mean);
+    stdDev = sqrt(max(variance, 0.0f));
+}
+
+
+void main()
+{
+    gShouldDenoise = 0;
+
+    barrier();
+
+    const ivec2 size         = textureSize(uHistoryOutput, 0);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    const vec2  pixelCenter  = vec2(currentCoord) + vec2(0.5);
+    const vec2  texCoord     = pixelCenter / vec2(size);
+    const float depth        = texelFetch(uDepthSampler, currentCoord, 0).r;
+    const float roughness    = texelFetch(uPBRSampler, currentCoord, 0).g;
+
+    vec4 outputRadiance = vec4(0.0f);
+    vec4 outputMoments  = vec4(0.0f);
+
+    if (depth != 1.0f)
+    {
+        vec4 colorRayLength     = texelFetch(uInput, currentCoord, 0);
+        vec3 color              = colorRayLength.rgb;
+        float rayLength   = colorRayLength.a;
+
+        vec3  historyColor;
+        vec2  historyMoments;
+        float historyLength;
+
+        bool success = reproject(currentCoord, 
+                                depth, 
+                                ubo.cameraPos.xyz,
+                                ubo.viewProjInv,
+                                ubo.prevViewProj,
+                                rayLength, 
+                                uColorSampler,
+                                uNormalSampler,
+                                uPBRSampler,
+                                uPrevColorSampler,
+                                uPrevNormalSampler,
+                                uPrevPBRSampler,
+                                uPrevDepthSampler,
+                                uHistoryOutput,
+                                uHistoryMoments,
+                                historyColor, 
+                                historyMoments, 
+                                historyLength);
+
+        historyLength = min(32.0f, success ? historyLength + 1.0f : 1.0f);
+
+        if (success)
+        {
+            vec3 stdDev;
+            vec3 mean;
+            neighborhoodStandardDeviation(ivec2(gl_GlobalInvocationID.xy), mean, stdDev);
+            vec3 radianceMin = mean - stdDev;
+            vec3 radianceMax = mean + stdDev;
+
+            historyColor.xyz = clipAABB(radianceMin, radianceMax, historyColor.xyz);
+        }
+
+
+        const float maxAccumulatedFrame   = length(pushConsts.cameraDelta) > 0.0f ? 8.f : historyLength;
+        
+        const float alpha                 = success ? max(pushConsts.alpha, 1.0 / maxAccumulatedFrame) : 1.0;
+        const float alphaMoments         = success ? max(pushConsts.momentsAlpha, 1.0 / maxAccumulatedFrame) : 1.0;
+
+        vec2 moments = vec2(0.0f);
+        moments.r    = luminance(color);
+        moments.g    = moments.r * moments.r;
+
+        moments = mix(historyMoments, moments, alphaMoments);
+
+        float variance = max(0.0f, moments.g - moments.r * moments.r);
+
+        vec3 accumulatedColor = mix(historyColor, color, alpha);
+
+        outputMoments  = vec4(moments, historyLength, 0.0f);
+        outputRadiance = vec4(accumulatedColor, variance);
+    } 
+
+    imageStore(moment,   currentCoord, outputMoments);
+    imageStore(outColor, currentCoord, outputRadiance);
+ 
+    if (depth != 1.0f)
+    {
+       gShouldDenoise =  roughness <= MIRROR_REFLECTIONS_ROUGHNESS_THRESHOLD || roughness >= DDGI_REFLECTIONS_ROUGHNESS_THRESHOLD ? 0 : 1;
+    }
+
+    barrier();
+
+    if (gl_LocalInvocationIndex == 0)
+    {
+        if (gShouldDenoise == 1)
+        {
+            uint idx = atomicAdd(denoiseTileDispatchArgs.numGroupsX, 1);
+            denoiseTileData.coord[idx] = currentCoord;
+        }
+        else
+        {
+            uint idx = atomicAdd(copyTileDispatchArgs.numGroupsX, 1);
+            copyTileData.coord[idx] = currentCoord;
+        }
+    }
+}

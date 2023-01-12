@@ -1,0 +1,130 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 460
+
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "DDGICommon.glsl"
+#include "../Common/Math.glsl"
+#include "../SDF/SDFCommon.glsl"
+#include "../SDF/AtlasCommon.glsl"
+
+layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D outColor;
+layout(set = 0, binding = 1) uniform sampler3D uGlobalSDF;
+layout(set = 0, binding = 2) uniform sampler3D uGlobalMipSDF;
+layout(set = 0, binding = 3)  uniform sampler2D uSurfaceAtlasTex;
+layout(set = 0, binding = 4)  uniform sampler2D uSurfaceAtlasDepth;
+layout(set = 0, binding = 5, std430) readonly buffer SDFAtlasTileBuffer{
+    TileBuffer data[];
+}atlasTiles;
+
+layout(set = 0, binding = 6, std430) readonly buffer SDFObjectBuffer{
+    ObjectBuffer data[];
+}objects;
+
+layout(set = 0, binding = 7, std430) readonly buffer SDFAtlasChunkBuffer{
+    uint data[];
+}atlasChunks;// start object index.
+
+layout(set = 0, binding = 8, std430) readonly buffer SDFCullObjectBuffer{
+    uint data[];
+}cullObjects;// object count -> [ index0, index1, ..... ]  
+
+layout(set = 0, binding = 9)  uniform samplerCube uSkybox;
+layout(set = 0, binding = 10) uniform UniformBufferObject
+{
+    GlobalSurfaceAtlasData data;
+    GlobalSDFData sdfData;
+}ubo;
+
+layout (set = 0, binding = 11, scalar) uniform DDGIUBO
+{
+    DDGIUniform ddgi;
+};
+
+layout(set = 0, binding = 12, rgba16f) uniform image2D iRadiance;
+layout(set = 0, binding = 13, rgba16f) uniform image2D iDirectionDistance;
+
+layout(push_constant) uniform PushConstants
+{
+    mat4  randomOrientation;
+    uint  numFrames;
+    uint  infiniteBounces;
+    int   numLights;
+    float intensity;
+}pushConsts;
+
+
+void main()
+{
+    const ivec2 texCoords   = ivec2(gl_GlobalInvocationID.xy);
+    const int rayId         = texCoords.x;
+    const int probeId       = texCoords.y;
+
+    if(rayId >= ddgi.raysPerProbe)
+        return;
+
+    vec3  rayOrigin = probeLocation(ddgi, probeId);
+    vec3  direction  = normalize(mat3(pushConsts.randomOrientation) * sphericalFibonacci(rayId,ddgi.raysPerProbe));
+
+    Random random = randomInit(texCoords, pushConsts.numFrames);
+
+    float hitDistance = GLOBAL_SDF_WORLD_SIZE;
+
+    GlobalSDFTrace trace;
+
+    trace.worldPosition = rayOrigin;
+    trace.worldDirection = direction;
+    trace.minDistance = 0;
+    trace.maxDistance = GLOBAL_SDF_WORLD_SIZE;
+    trace.stepScale = 1.f;
+    trace.needsHitNormal = true;
+    GlobalSDFHit hit = tracyGlobalSDF(ubo.sdfData, uGlobalSDF, uGlobalMipSDF, trace, 0); 
+
+    vec4 radiance = vec4(0);
+
+    if(isHit(hit))
+    {
+        if (hit.hitSDF <= 0.0f && hit.hitTime <= ubo.sdfData.cascadeVoxelSize[0])
+        {
+            radiance = vec4(0, 0, 0, GLOBAL_SDF_WORLD_SIZE);
+        }
+        else
+        {
+            vec3 hitPosition = getHitPosition(hit,trace);
+            float surfaceThreshold = getGlobalSurfaceAtlasThreshold(ubo.sdfData, hit);
+
+            vec4 surfaceColor;
+
+            sampleGlobalSurfaceAtlas(surfaceColor,ubo.data, 
+                                atlasChunks.data,  
+                                cullObjects.data,  
+                                objects.data, 
+                                atlasTiles.data,  
+                                uSurfaceAtlasDepth,  
+                                uSurfaceAtlasTex, 
+                                getHitPosition(hit, trace),
+                                hit.hitNormal, 
+                                surfaceThreshold ,
+                                false);
+
+            radiance = vec4(surfaceColor.rgb, hit.hitTime);
+
+            radiance.w = max(radiance.w + ubo.sdfData.cascadeVoxelSize[hit.hitCascade] * 0.5f, 0);
+        }
+    }
+    else
+    {
+        radiance = vec4(texture(uSkybox, direction).rgb, GLOBAL_SDF_WORLD_SIZE);  
+    }
+    
+    imageStore(iRadiance, texCoords, vec4(radiance.xyz, 0.0f));
+    imageStore(iDirectionDistance, texCoords, vec4(direction,radiance.w));
+}
+
+// ------------------------------------------------------------------------

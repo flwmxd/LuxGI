@@ -1,0 +1,68 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "SDFCommon.glsl"
+
+#define LOCAL_SIZE_X 4
+#define LOCAL_SIZE_Y 4
+#define LOCAL_SIZE_Z 4
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = LOCAL_SIZE_Z) in;
+
+
+layout(set = 0, binding = 0,r16f) uniform image3D uGlobalSDF;
+layout(set = 0, binding = 1,r16f) uniform image3D uGlobalMipSDF;
+
+
+layout(push_constant) uniform PushConsts
+{
+    int globalSDFResolution;
+    int mipmapCoordScale;
+    int cascadeTexOffsetX;   //these two were based on cascade...
+    int cascadeMipMapOffsetX;//because cascade is saved by horizontal
+    float maxDistance;
+} pushConsts;
+
+
+float sampleSDF(ivec3 voxelCoordMip, ivec3 offset)
+{
+	voxelCoordMip = clamp(voxelCoordMip * pushConsts.mipmapCoordScale + offset, ivec3(0), ivec3(pushConsts.globalSDFResolution - 1));
+	voxelCoordMip.x += pushConsts.cascadeTexOffsetX;
+	float result = imageLoad(uGlobalSDF,voxelCoordMip).r;
+
+    /**
+    * [_] ---A--- [_]
+    * not accuratly
+    * the distance between two voxels.
+    **/
+	float distanceToVoxel = length(offset) * (pushConsts.maxDistance / float(pushConsts.globalSDFResolution));
+	result = combineDistanceToSDF(result, distanceToVoxel);
+	return result;
+}
+
+void main()
+{
+    ivec3 uvw = ivec3(gl_GlobalInvocationID.xyz);
+
+	float minDistance = sampleSDF(uvw, ivec3(0, 0, 0));
+
+    ivec3 coords[6] = {
+        ivec3(1, 0, 0) ,
+        ivec3(0, 1, 0), 
+        ivec3(0, 0, 1), 
+        ivec3(-1, 0, 0),
+        ivec3(0, -1, 0),
+        ivec3(0, 0, -1)
+    };
+
+    for(int i = 0;i<6;i++){
+        minDistance = min(minDistance, sampleSDF(uvw, coords[i]));
+    }
+	uvw.x += pushConsts.cascadeMipMapOffsetX;
+	imageStore(uGlobalMipSDF,uvw, vec4(minDistance));
+}

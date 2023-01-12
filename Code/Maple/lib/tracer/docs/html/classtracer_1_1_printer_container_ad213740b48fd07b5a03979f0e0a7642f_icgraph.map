@@ -1,0 +1,6 @@
+<map id="tracer::PrinterContainer::fancy" name="tracer::PrinterContainer::fancy">
+<area shape="rect" id="node2" href="$tracer_8h.html#ac0c6c6470c56cc6f8414019b2c6d46b6" title="Wrapper for tracer::PrinterContainer::fancy. " alt="" coords="231,5,384,32"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_tracer_handler.html#ac3898a7b4670bfb6ab26a8465b7cd59b" title="Basic setup, sufficient for most use cases. " alt="" coords="228,57,387,98"/>
+<area shape="rect" id="node4" href="$tracer_8h.html#a974132af1f7d60eb2d36060b1e735f37" title="Runs tracer::TracerHandler::getTracer()&#45;&gt;defaultSetup();. " alt="" coords="453,35,575,61"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_tracer_handler.html#add3e3ebc8029b9889825d302fc7a3000" title="Sets the new configuration. " alt="" coords="435,86,593,127"/>
+</map>

@@ -1,0 +1,38 @@
+set( FILE_LIST
+
+@CM_ALL_SOURCE_FILES@
+)
+
+execute_process(
+   COMMAND clang-format --version
+   RESULT_VARIABLE FOUND
+   OUTPUT_VARIABLE VER_RAW
+)
+
+if( NOT ${GIT_FOUND} MATCHES 0 )
+   message( FATAL_ERROR "unable to find clang-format" )
+endif( NOT ${GIT_FOUND} MATCHES 0 )
+
+string( REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" VER "${VER_RAW}" )
+
+if( NOT "${VER}" VERSION_EQUAL @CM_CLANG_FORMAT_VER@ )
+   message( FATAL_ERROR "required clang-format version: @CM_CLANG_FORMAT_VER@ (current: ${VER})" )
+endif( NOT "${VER}" VERSION_EQUAL @CM_CLANG_FORMAT_VER@ )
+
+message( STATUS "clang-format version: ${VER}" )
+
+set( NUM_MOD 0 )
+
+foreach( I IN LISTS FILE_LIST )
+   file( SHA256 "${I}" HASH_1 )
+   execute_process( COMMAND clang-format -i "${I}" )
+   file( SHA256 "${I}" HASH_2 )
+
+   if( NOT HASH_1 STREQUAL HASH_2 )
+      message( STATUS "Formated ${I}" )
+      math( EXPR NUM_MOD "${NUM_MOD} + 1" )
+   endif( NOT HASH_1 STREQUAL HASH_2 )
+endforeach( I IN LISTS FILE_LIST )
+
+list( LENGTH FILE_LIST COUNT )
+message( STATUS "${NUM_MOD} of ${COUNT} files changed" )

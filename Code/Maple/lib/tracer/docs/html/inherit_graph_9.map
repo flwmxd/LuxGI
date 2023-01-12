@@ -1,0 +1,7 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classtracer_1_1_abstract_tracer.html" title="Base class / interface of all tracers. " alt="" coords="5,81,167,108"/>
+<area shape="rect" id="node2" href="$classtracer_1_1_dummy_tracer.html" title="This tracer does nothing. " alt="" coords="223,5,381,32"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_glib_c_tracer.html" title="Tracer based on glibc&#39;s backtrace (execinfo.h) " alt="" coords="231,56,373,83"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_lib_unwind_tracer.html" title="Backtrace generator based on libunwind. " alt="" coords="215,107,389,133"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_win32_tracer.html" title="Backtrace generator for the WIN32 API. " alt="" coords="228,157,376,184"/>
+</map>

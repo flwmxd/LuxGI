@@ -1,0 +1,5 @@
+<map id="tracer::FilePrinter" name="tracer::FilePrinter">
+<area shape="rect" id="node4" href="$classtracer_1_1_fancy_printer.html" title="Wrapper for both FilePrinter and SystemInfoPrinter. " alt="" coords="14,229,162,256"/>
+<area shape="rect" id="node2" href="$classtracer_1_1_default_printer.html" title="Gnerates strings from the frame structure. " alt="" coords="9,80,167,107"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_abstract_printer.html" title="Basic class for all printers. " alt="" coords="5,5,171,32"/>
+</map>

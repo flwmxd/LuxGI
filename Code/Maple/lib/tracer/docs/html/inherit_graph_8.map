@@ -1,0 +1,7 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classtracer_1_1_abstract_printer.html" title="Basic class for all printers. " alt="" coords="5,31,171,57"/>
+<area shape="rect" id="node2" href="$classtracer_1_1_default_printer.html" title="Gnerates strings from the frame structure. " alt="" coords="219,31,377,57"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_file_printer.html" title="Prints file contents when line information is avaliable in the frame. " alt="" coords="451,5,585,32"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_system_info_printer.html" title="Prints additional information before the first stack frame. " alt="" coords="425,56,611,83"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_fancy_printer.html" title="Wrapper for both FilePrinter and SystemInfoPrinter. " alt="" coords="659,31,807,57"/>
+</map>

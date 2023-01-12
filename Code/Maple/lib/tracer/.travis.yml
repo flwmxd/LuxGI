@@ -1,0 +1,17 @@
+language: cpp
+
+dist: trusty
+sudo: required
+
+services:
+  - docker
+
+compiler:
+  - gcc
+  - clang
+
+install:
+  - docker pull mensinda/archlinux_vulkan
+
+script:
+  - docker run -p 127.0.0.1:80:4567 -t --name builder -v "$PWD":"$PWD" -w "$PWD" mensinda/archlinux_vulkan ./travisRun.sh $CXX

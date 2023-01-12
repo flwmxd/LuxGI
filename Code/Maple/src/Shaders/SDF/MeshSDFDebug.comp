@@ -1,0 +1,120 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#define LOCAL_SIZE_X 8
+#define LOCAL_SIZE_Y 8
+#define LOCAL_SIZE_Z 1
+#extension GL_GOOGLE_include_directive : enable
+
+#include "SDFCommon.glsl"
+#include "AtlasCommon.glsl"
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = LOCAL_SIZE_Z) in;
+
+layout(set = 0, binding = 0) uniform UniformBufferObject
+{    
+    vec4 viewFrustumWorldRays[4];
+    GlobalSurfaceAtlasData data;
+    GlobalSDFData sdfData;
+    int debugType;
+    float stepScale;
+} ubo;
+
+
+#define DRAW_SDF 0
+#define DRAW_COLOR 1
+
+layout(set = 0, binding = 1)  uniform sampler3D uGlobalSDF;
+layout(set = 0, binding = 2)  uniform sampler3D uGlobalMipSDF;
+layout(set = 0, binding = 3)  uniform sampler2D uSurfaceAtlasTex;
+layout(set = 0, binding = 4)  uniform sampler2D uSurfaceAtlasDepth;
+
+layout(set = 0, binding = 5, std430) readonly buffer SDFAtlasTileBuffer{
+    TileBuffer data[];
+}atlasTiles;
+
+layout(set = 0, binding = 6, std430) readonly buffer SDFObjectBuffer{
+    ObjectBuffer data[];
+}objects;
+
+layout(set = 0, binding = 7, std430) readonly buffer SDFAtlasChunkBuffer{
+    uint data[];
+}atlasChunks;// start object index.
+
+layout(set = 0, binding = 8, std430) readonly buffer SDFCullObjectBuffer{
+    uint data[];
+}cullObjects;// object count -> [ index0, index1, ..... ]  
+
+layout(set = 0, binding = 9)  uniform samplerCube uSkybox;
+
+layout(set = 0, binding = 10, rgba32f)  uniform image2D uScreen;
+
+void main()
+{
+    ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+    vec2 pixelCoor = vec2(uv.xy) / imageSize(uScreen);
+
+	vec3 viewRay = mix(
+        mix(ubo.viewFrustumWorldRays[3], ubo.viewFrustumWorldRays[0], pixelCoor.x), 
+        mix(ubo.viewFrustumWorldRays[2], ubo.viewFrustumWorldRays[1], pixelCoor.x), 
+        1 - pixelCoor.y
+    ).xyz; 
+	
+	GlobalSDFTrace trace;
+
+    viewRay = normalize(viewRay - ubo.data.cameraPos);
+    trace.worldPosition = ubo.data.cameraPos;
+    trace.worldDirection = viewRay;
+    trace.minDistance = ubo.sdfData.nearPlane;
+    trace.maxDistance = ubo.sdfData.farPlane;
+    trace.stepScale = ubo.stepScale;//ubo.cameraPosition.w;
+    trace.needsHitNormal = true;
+    GlobalSDFHit hit = tracyGlobalSDF(ubo.sdfData, uGlobalSDF, uGlobalMipSDF, trace, 0.0); 
+    vec4 color = vec4(0);
+    if(ubo.debugType == DRAW_SDF)
+    {
+        color = vec4(clamp(hit.stepsCount / 80.f ,0,1));
+        if(!isHit(hit))
+        {
+            color.rb *= 0.3; 
+        }
+    }
+    else if(ubo.debugType == DRAW_COLOR)
+    {
+        if(isHit(hit))
+        {
+            // Sample Global Surface Atlas at the hit location
+            float surfaceThreshold = getGlobalSurfaceAtlasThreshold(ubo.sdfData, hit);
+            vec4 cc;
+            sampleGlobalSurfaceAtlas(cc,ubo.data, 
+                                    atlasChunks.data,  
+                                    cullObjects.data,  
+                                    objects.data, 
+                                    atlasTiles.data,  
+                                    uSurfaceAtlasDepth,  
+                                    uSurfaceAtlasTex, 
+                                    getHitPosition(hit, trace), 
+                                    hit.hitNormal,
+                                    surfaceThreshold ,
+                                    false); 
+            color = cc; 
+        } 
+        else
+        { 
+           color.xyz = texture(uSkybox, viewRay).rgb;  
+        }
+    }
+    else
+    {
+        if(isHit(hit))
+        {
+            color.xyz = hit.hitNormal;
+        }
+    }
+    imageStore(uScreen,uv,color);
+}
+
+
+

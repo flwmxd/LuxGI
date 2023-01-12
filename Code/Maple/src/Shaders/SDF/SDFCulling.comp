@@ -1,0 +1,101 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "AtlasCommon.glsl"
+
+#define GLOBAL_SURFACE_ATLAS_CULL_LOCAL_SIZE 32 
+
+#define GLOBAL_SURFACE_ATLAS_CHUNKS_GROUP_SIZE 4
+
+layout(local_size_x = GLOBAL_SURFACE_ATLAS_CHUNKS_GROUP_SIZE, 
+       local_size_y = GLOBAL_SURFACE_ATLAS_CHUNKS_GROUP_SIZE, 
+       local_size_z = GLOBAL_SURFACE_ATLAS_CHUNKS_GROUP_SIZE) in;
+
+layout(push_constant) uniform PushConsts
+{
+   GlobalSurfaceAtlasData data;
+} pushConsts;
+
+layout(set = 0, binding = 0, std430) readonly buffer SDFObjectBuffer{
+    ObjectBuffer data[];
+}objects;
+
+layout(set = 0, binding = 1, std430) buffer SDFAtlasChunkBuffer{
+    uint data[];
+}atlasChunks;// start object index.
+
+layout(set = 0, binding = 2, std430) buffer SDFCullObjectBuffer{
+    uint data[];
+}cullObjects;// object count -> [ index0, index1, ..... ]  
+
+void main()
+{
+    ivec3 chunkCoord = ivec3(gl_GlobalInvocationID.xyz);
+	uint chunkAddress = flattenId(chunkCoord);
+
+//pushConsts.data.cameraPos +
+	vec3 chunkMin = ( vec3(chunkCoord) - (GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION * 0.5f)) * pushConsts.data.chunkSize;
+	vec3 chunkMax = chunkMin + pushConsts.data.chunkSize;
+
+    uint objectsCount = 0;
+	uint localCulledObjects[GLOBAL_SURFACE_ATLAS_CULL_LOCAL_SIZE];
+
+    for (uint objectIndex = 0; objectIndex < pushConsts.data.objectsCount; objectIndex++)
+	{
+        ObjectBuffer obj = objects.data[objectIndex];
+
+		if (boxIntersectsSphere(chunkMin, chunkMax, obj.objectBounds.xyz, obj.objectBounds.w))
+		{
+		    localCulledObjects[objectsCount % GLOBAL_SURFACE_ATLAS_CULL_LOCAL_SIZE] = objectIndex;
+			objectsCount++;
+		}
+	}
+	if (objectsCount == 0)
+	{
+        atlasChunks.data[0] = chunkAddress;
+		return;
+	}
+    
+	uint objectsSize  = objectsCount + 1;
+    uint objectsStart = atomicAdd(cullObjects.data[0], objectsSize);
+
+	if (objectsStart + objectsSize > pushConsts.data.culledObjectsCapacity)
+	{
+		atlasChunks.data[0] = chunkAddress;
+		return;
+	}
+
+    cullObjects.data[objectsStart] = objectsCount;
+
+    atlasChunks.data[chunkAddress] = objectsStart;
+
+    /// -> chunk -> start -> count -> for( count ... )
+
+    uint objectAddress = 0;
+	if (objectsCount <= GLOBAL_SURFACE_ATLAS_CULL_LOCAL_SIZE)
+	{
+        for (uint objectIndex = 0; objectIndex < objectsCount; objectIndex++)
+        {
+            objectAddress = localCulledObjects[objectIndex];
+            objectsStart++;
+            cullObjects.data[objectsStart] = objectAddress;
+        }
+	}
+	else
+	{
+        for (uint objectIndex = 0; objectIndex < pushConsts.data.objectsCount; objectIndex++)
+        {
+            ObjectBuffer obj = objects.data[objectIndex];
+            if (boxIntersectsSphere(chunkMin, chunkMax, obj.objectBounds.xyz, obj.objectBounds.w))
+            {
+                objectsStart++;
+                cullObjects.data[objectsStart] = objectIndex;
+            }
+        }
+    }
+}

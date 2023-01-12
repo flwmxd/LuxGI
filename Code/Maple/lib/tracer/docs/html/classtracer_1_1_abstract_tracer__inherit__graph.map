@@ -1,0 +1,6 @@
+<map id="tracer::AbstractTracer" name="tracer::AbstractTracer">
+<area shape="rect" id="node2" href="$classtracer_1_1_dummy_tracer.html" title="This tracer does nothing. " alt="" coords="5,80,164,107"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_glib_c_tracer.html" title="Tracer based on glibc&#39;s backtrace (execinfo.h) " alt="" coords="188,80,331,107"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_lib_unwind_tracer.html" title="Backtrace generator based on libunwind. " alt="" coords="355,80,529,107"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_win32_tracer.html" title="Backtrace generator for the WIN32 API. " alt="" coords="553,80,701,107"/>
+</map>

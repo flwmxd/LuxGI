@@ -1,0 +1,164 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "../Reflection/ReflectionCommon.glsl"
+#include "../Common/Light.glsl"
+#include "../Common/Math.glsl"
+#include "../Raytraced/BlueNoise.glsl"
+#include "../Raytraced/BRDF.glsl"
+#include "../SDF/AtlasCommon.glsl"
+#include "../SDF/SDFCommon.glsl"
+#include "../DDGI/DDGICommon.glsl"
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D outColor;
+layout(set = 0, binding = 1) uniform sampler3D uGlobalSDF;
+layout(set = 0, binding = 2) uniform sampler3D uGlobalMipSDF;
+layout(set = 0, binding = 3)  uniform sampler2D uSurfaceAtlasTex;
+layout(set = 0, binding = 4)  uniform sampler2D uSurfaceAtlasDepth;
+layout(set = 0, binding = 5, std430) readonly buffer SDFAtlasTileBuffer{
+    TileBuffer data[];
+}atlasTiles;
+
+layout(set = 0, binding = 6, std430) readonly buffer SDFObjectBuffer{
+    ObjectBuffer data[];
+}objects;
+
+layout(set = 0, binding = 7, std430) readonly buffer SDFAtlasChunkBuffer{
+    uint data[];
+}atlasChunks;// start object index.
+
+layout(set = 0, binding = 8, std430) readonly buffer SDFCullObjectBuffer{
+    uint data[];
+}cullObjects;// object count -> [ index0, index1, ..... ]  
+
+layout(set = 0, binding = 9)  uniform samplerCube uSkybox;
+
+layout(set = 0, binding = 10) uniform UniformBufferObject
+{
+    GlobalSurfaceAtlasData data;
+    GlobalSDFData sdfData;
+}ubo;
+
+layout(set = 0, binding = 11) uniform sampler2D uColorSampler;
+layout(set = 0, binding = 12) uniform sampler2D uNormalSampler;
+layout(set = 0, binding = 13) uniform sampler2D uDepthSampler;
+layout(set = 0, binding = 14) uniform sampler2D uPBRSampler;
+layout(set = 0, binding = 15) uniform sampler2D uSobolSequence;
+layout(set = 0, binding = 16) uniform sampler2D uScramblingRankingTile;
+
+layout (set = 0, binding = 17) uniform sampler2D uIrradiance;
+layout (set = 0, binding = 18) uniform sampler2D uDepth;
+layout (set = 0, binding = 19, scalar) uniform DDGIUBO
+{
+    DDGIUniform ddgi;
+};
+
+layout(push_constant) uniform PushConstants
+{
+    float bias;
+    float trim;
+    float intensity;
+    float roughDDGIIntensity;
+    uint  numLights;
+    uint  numFrames;
+    uint  sampleGI;
+    uint  approximateWithDDGI;
+    vec4  cameraPosition;
+    mat4  viewProjInv;
+}pushConsts;
+
+vec2 nextSample(ivec2 coord)
+{
+    return vec2(sampleBlueNoise(coord, int(pushConsts.numFrames), 0, uSobolSequence, uScramblingRankingTile),
+                sampleBlueNoise(coord, int(pushConsts.numFrames), 1, uSobolSequence, uScramblingRankingTile));
+}
+
+vec4 trace(vec2 texCoord, vec3 worldPos, float rayStep, vec3 R, float threshold)
+{
+    GlobalSDFTrace trace;
+    trace.worldPosition = worldPos;
+    trace.worldDirection = R;
+    trace.minDistance = 0;
+    trace.maxDistance = GLOBAL_SDF_WORLD_SIZE;
+    trace.stepScale = 1;  
+    trace.needsHitNormal = false;
+    GlobalSDFHit hit = tracyGlobalSDF(ubo.sdfData, uGlobalSDF, uGlobalMipSDF, trace,0);
+ 
+    vec4 color;
+
+    if(isHit(hit)) 
+    {
+        float surfaceThreshold = getGlobalSurfaceAtlasThreshold(ubo.sdfData, hit);
+        sampleGlobalSurfaceAtlas(color,ubo.data, 
+                                atlasChunks.data,  
+                                cullObjects.data,  
+                                objects.data, 
+                                atlasTiles.data,  
+                                uSurfaceAtlasDepth,  
+                                uSurfaceAtlasTex, 
+                                getHitPosition(hit, trace),
+                                -R, 
+                                surfaceThreshold ,
+                                false);
+        return color;
+    }
+    return texture(uSkybox,R);
+}
+
+void main()
+{
+    const ivec2 size = textureSize(uPBRSampler, 0);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    const vec2  pixelCenter  = vec2(currentCoord) + vec2(0.5);
+    const vec2  texCoord     = pixelCenter / vec2(size);
+    float rayStep = 2.0 / size.x;
+    float depth = texelFetch(uDepthSampler, currentCoord, 0).r;
+    vec3 worldPos  = worldPositionFromDepth(texCoord, depth, pushConsts.viewProjInv);
+    float roughness = texelFetch(uPBRSampler, currentCoord, 0).g;
+ 
+    if (depth != 1.0f)
+    {
+        vec3 normal    = octohedralToDirection(texture(uNormalSampler,texCoord).xy);
+        vec3 Wo     = normalize(pushConsts.cameraPosition.xyz - worldPos.xyz);
+ 
+        float selfOcclusionBias = ubo.sdfData.cascadeVoxelSize[0];
+        worldPos += normal * selfOcclusionBias;
+
+        vec3 R; 
+
+        vec4 color = vec4(0);
+        float threshold = MIRROR_REFLECTIONS_ROUGHNESS_THRESHOLD;
+        //0.05...
+        if (roughness < MIRROR_REFLECTIONS_ROUGHNESS_THRESHOLD)
+        {
+            R = reflect(-Wo, normal.xyz);
+            color = trace(texCoord, worldPos, rayStep, R, MIRROR_REFLECTIONS_ROUGHNESS_THRESHOLD);
+        }
+        //0.75...
+        else if ( roughness > DDGI_REFLECTIONS_ROUGHNESS_THRESHOLD && pushConsts.approximateWithDDGI == 1 )
+        {
+            R = reflect(-Wo, normal.xyz); 
+            //sample with GI
+            color.xyz = pushConsts.roughDDGIIntensity * sampleIrradiance(ddgi, worldPos, R, Wo, uIrradiance, uDepth);
+        }
+        else
+        {
+            vec2 Xi = nextSample(currentCoord) * pushConsts.trim;
+            vec4 WhPDF = importanceSampleGGX(Xi, normal, roughness);
+            float pdf = WhPDF.w;
+            R = reflect(-Wo, WhPDF.xyz);
+            color = trace(texCoord, worldPos, rayStep, R, DDGI_REFLECTIONS_ROUGHNESS_THRESHOLD);
+        }
+         imageStore(outColor, currentCoord, color); 
+    }
+}
+
+// ------------------------------------------------------------------

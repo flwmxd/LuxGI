@@ -1,0 +1,210 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "../Raytraced/Reprojection.glsl"
+
+
+#define NUM_THREADS_X 8
+#define NUM_THREADS_Y 8
+
+
+#define RAY_MASK_SIZE_X 8
+#define RAY_MASK_SIZE_Y 4
+
+layout(local_size_x = NUM_THREADS_X, local_size_y = NUM_THREADS_Y, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rg16f)     uniform writeonly image2D outColor;
+layout(set = 0, binding = 1, rgba16f)   uniform writeonly image2D moment;
+layout(set = 0, binding = 2)            uniform sampler2D uHistoryOutput;
+layout(set = 0, binding = 3)            uniform sampler2D uHistoryMoments;
+layout(set = 0, binding = 4)            uniform usampler2D uInput;
+layout(set = 0, binding = 5)            uniform UniformBufferObject
+{
+    mat4 viewProjInv;
+}ubo;
+
+layout(set = 1, binding = 0) uniform sampler2D uColorSampler;
+layout(set = 1, binding = 1) uniform sampler2D uNormalSampler;
+layout(set = 1, binding = 2) uniform sampler2D uDepthSampler;
+
+layout(set = 2, binding = 0) uniform sampler2D uPrevColorSampler;
+layout(set = 2, binding = 1) uniform sampler2D uPrevNormalSampler;
+layout(set = 2, binding = 2) uniform sampler2D uPrevDepthSampler;
+
+layout(set = 3, binding = 0, std430) buffer DenoiseTileData
+{
+    ivec2 coord[];
+}denoiseTileData;
+
+layout(set = 3, binding = 1, std430) buffer DenoiseTileDispatchArgs
+{
+    uint numGroupsX;
+    uint numGroupsY;
+    uint numGroupsZ;
+}denoiseTileDispatchArgs;
+
+layout(set = 3, binding = 2, std430) buffer ShadowTileData
+{
+    ivec2 coord[];
+}shadowTileData;
+
+layout(set = 3, binding = 3, std430) buffer ShadowTileDispatchArgs
+{
+    uint numGroupsX;
+    uint numGroupsY;
+    uint numGroupsZ;
+}shadowTileDispatchArgs;
+
+layout(push_constant) uniform PushConstants
+{
+    float alpha;
+    float momentsAlpha;
+}pushConsts;
+
+shared uint  gShadowHitMasks[3][6];
+shared float gMeanAccumulation[8][24];
+shared uint  gShouldDenoise;
+
+void loadCache()
+{   
+    if (gl_LocalInvocationID.x < 3 && gl_LocalInvocationID.y < 6)
+    {
+        ivec2 coord = ivec2(gl_WorkGroupID.x, gl_WorkGroupID.y * 2) - ivec2(1, 2) + ivec2(gl_LocalInvocationID.xy);
+        gShadowHitMasks[gl_LocalInvocationID.x][gl_LocalInvocationID.y] = texelFetch(uInput, coord, 0).x;
+    }
+    barrier();
+}
+
+float unpackShadowHitValue(ivec2 coord)
+{
+    const ivec2 workGroupStartCoord = ivec2(gl_WorkGroupID.xy) * ivec2(NUM_THREADS_X, NUM_THREADS_Y);
+    const ivec2 cacheStartCoord = workGroupStartCoord - ivec2(RAY_MASK_SIZE_X, RAY_MASK_SIZE_Y * 2);
+    const ivec2 unpackedCacheCoord = coord - cacheStartCoord;
+    const ivec2 packedCacheCoord = unpackedCacheCoord / ivec2(RAY_MASK_SIZE_X, RAY_MASK_SIZE_Y);
+    const ivec2 maskStartCoord = packedCacheCoord * ivec2(RAY_MASK_SIZE_X, RAY_MASK_SIZE_Y);
+    const ivec2 relativeMaskCoord = unpackedCacheCoord - maskStartCoord;
+    const int hitIndex = relativeMaskCoord.y * RAY_MASK_SIZE_X + relativeMaskCoord.x;
+    return float((gShadowHitMasks[packedCacheCoord.x][packedCacheCoord.y] >> hitIndex) & 1u);
+}
+
+float horizontalMean(ivec2 coord)
+{
+    float result = 0.0f;
+
+    for (int x = -8; x <= 8; x++)// 17
+        result += unpackShadowHitValue(ivec2(coord.x + x, coord.y));
+
+    return result;
+}
+
+float computeMean(ivec2 coord)
+{
+    float top    = horizontalMean(ivec2(coord.x, coord.y - 8));
+    float middle = horizontalMean(ivec2(coord.x, coord.y));
+    float bottom = horizontalMean(ivec2(coord.x, coord.y + 8));
+
+    gMeanAccumulation[gl_LocalInvocationID.x][gl_LocalInvocationID.y]      = top;
+    gMeanAccumulation[gl_LocalInvocationID.x][gl_LocalInvocationID.y + 8]  = middle;
+    gMeanAccumulation[gl_LocalInvocationID.x][gl_LocalInvocationID.y + 16] = bottom;
+
+    barrier();
+
+    const int   radius = 8;
+    const float weight = (float(radius) * 2.0f + 1.0f) * (float(radius) * 2.0f + 1.0f);
+
+    float mean = 0.0f;
+
+    for (int y = 0; y <= 16; y++)
+        mean += gMeanAccumulation[gl_LocalInvocationID.x][gl_LocalInvocationID.y + y];
+
+    return mean / weight;
+}
+
+
+void main()
+{
+    gShouldDenoise = 0;
+
+    barrier();
+
+    const ivec2 size          = textureSize(uHistoryOutput, 0);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    loadCache();
+    float mean = computeMean(currentCoord);
+    float depth = texelFetch(uDepthSampler, currentCoord, 0).r;
+
+    float visibility               = 0.0f;
+    vec2  outputVisibilityVariance = vec2(0.0f);
+    vec2  outputMoments            = vec2(0.0f);
+    float historyLength            = 0.0f;
+    float meshId = texelFetch(uColorSampler, currentCoord, 0).a;
+    float prevMeshId = texelFetch(uPrevColorSampler, currentCoord, 0).a;
+    if (depth != 1.0f)
+    {
+        visibility = unpackShadowHitValue(currentCoord);
+        float historyVisibility;
+        vec2  historyMoments;
+
+        bool success = reproject(currentCoord,
+                                 depth,
+                                 ubo.viewProjInv,
+                                 uColorSampler,
+                                 uNormalSampler,
+                                 uPrevColorSampler,
+                                 uPrevNormalSampler,
+                                 uPrevDepthSampler,
+                                 uHistoryOutput,
+                                 uHistoryMoments,
+                                 historyVisibility,
+                                 historyMoments,
+                                 historyLength);
+
+        historyLength = min(32.0f, success ? historyLength + 1.0f : 1.0f);
+
+        if (success)
+        {
+            float spatialVariance    = max(mean - mean * mean, 0.0f);
+            // Compute the clamping bounding box
+            const float stdDeviation = sqrt(spatialVariance);
+            const float nmin         = mean - 0.5f * stdDeviation;
+            const float nmax         = mean + 0.5f * stdDeviation;
+
+            historyVisibility = clamp(historyVisibility, nmin, nmax);
+        }
+
+        const float alpha        = success ? max(pushConsts.alpha, 1.0 / historyLength) : 1.0;
+        const float alphaMoments = success ? max(pushConsts.momentsAlpha, 1.0 / historyLength) : 1.0;
+        
+        outputMoments.r = visibility;
+        outputMoments.g = visibility * visibility;
+        outputMoments = mix(historyMoments, outputMoments, alphaMoments);
+
+        outputVisibilityVariance.x = mix(historyVisibility, visibility, alpha);
+        outputVisibilityVariance.y = max(0.0f, outputMoments.g - outputMoments.r * outputMoments.r);
+    } 
+
+    imageStore(moment,   currentCoord, vec4(outputMoments, historyLength, 0.0f));
+    imageStore(outColor, currentCoord, vec4(outputVisibilityVariance, 0.0f, 0.0f));
+
+    if (depth != 1.0f && outputVisibilityVariance.x > 0.0f)
+        gShouldDenoise = 1;
+
+    barrier();
+
+    if (gl_LocalInvocationIndex == 0)
+    {
+        if (gShouldDenoise == 1)
+        {
+            uint idx                   = atomicAdd(denoiseTileDispatchArgs.numGroupsX, 1);
+            denoiseTileData.coord[idx] = currentCoord;
+        }
+        else
+        {
+            uint idx                  = atomicAdd(shadowTileDispatchArgs.numGroupsX, 1);
+            shadowTileData.coord[idx] = currentCoord;
+        }
+    }
+}

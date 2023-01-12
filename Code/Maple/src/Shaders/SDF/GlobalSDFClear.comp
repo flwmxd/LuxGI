@@ -1,0 +1,33 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "ObjectRasterizeData.glsl"
+#include "SDFCommon.glsl"
+
+#define GLOBAL_SDF_RASTERIZE_MODEL_MAX_COUNT 28
+#define LOCAL_SIZE_X 8
+#define LOCAL_SIZE_Y 8
+#define LOCAL_SIZE_Z 8
+
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y, local_size_z = LOCAL_SIZE_Z) in;
+
+layout(set = 0, binding = 0,r16f) uniform image3D uGlobalSDF;
+
+layout(push_constant) uniform PushConsts
+{
+	ivec3 chunkCoord;
+	int   cascadeOffset;
+} pushConsts;
+
+void main()
+{
+    ivec3 uvw = ivec3(gl_GlobalInvocationID.xyz);
+	ivec3 voxelCoord = pushConsts.chunkCoord + uvw;
+	voxelCoord.x += pushConsts.cascadeOffset;
+    imageStore(uGlobalSDF, voxelCoord, vec4(1.0));
+}

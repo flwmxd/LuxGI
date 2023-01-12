@@ -1,0 +1,353 @@
+# Blender 3.3.1 MTL File: 'MJ视觉工作室.blend'
+# www.blender.org
+
+newmtl Bench
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd bench_Albedo.jpg
+map_Pr bench_Roughness.jpg
+map_Bump -bm 1.000000 bench_Normal.jpg
+
+newmtl Black
+Ns 1000.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+
+newmtl Blind
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd blind_Albedo.jpg
+map_Pr blind_Roughness.jpg
+map_Pm blind_Metalness.jpg
+map_Bump -bm 1.000000 blind_Normal.jpg
+
+newmtl Cig_butts
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd T_Cig_butts_A.jpg
+map_Pr T_Cig_butts_Roughness.jpg
+map_Pm T_Cig_butts_metalness.jpg
+map_Bump -bm 1.000000 T_Cig_butts_N.jpg
+
+newmtl Couch
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd couch_Albedo.jpg
+map_Pr couch_Roughness.jpg
+map_Pm couch_Metalness.jpg
+map_Bump -bm 1.000000 couch_Normal.jpg
+
+newmtl Curtain
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Curtain_Albedo.jpg
+map_Pr Curtain_Roughness.jpg
+map_Bump -bm 1.000000 Curtain_Normal.jpg
+
+newmtl Cushion
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Cushion_Albedo.jpg
+map_Pr Cushion_Roughness.jpg
+map_Bump -bm 1.000000 Cushion_Normal.jpg
+
+newmtl Desk
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Desk_Albedo.jpg
+map_Pr Desk_Roughness.jpg
+map_Bump -bm 1.000000 Desk_Normal.jpg
+
+newmtl Docs
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd folders_A.jpg
+map_Bump -bm 1.000000 folders_N.jpg
+
+newmtl Door_01
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Door_01_Albedo.jpg
+map_Pr Door_01_Roughness.jpg
+map_Pm Door_01_Metalness.jpg
+map_Bump -bm 1.000000 Door_01_Normal.jpg
+
+newmtl Door_02
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Door_02_Albedo.jpg
+map_Pr Door_02_Roughness.jpg
+map_Pm Door_02_Metalness.jpg
+map_Bump -bm 1.000000 Door_02_Normal.jpg
+
+newmtl Floor
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Floor_Albedo.jpg
+map_Pr Floor_Roughness.jpg
+map_Bump -bm 1.000000 Floor_Normal.jpg
+
+newmtl Frame
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Frame_Albedo.jpg
+map_Pr Frame_Roughness.jpg
+map_Bump -bm 1.000000 Frame_Normal.jpg
+
+newmtl Glass
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 0.839749
+illum 9
+map_Kd Glass_Albedo.jpg
+map_Pr Glass_Roughness.jpg
+map_Pm Glass_Metalness.jpg
+map_Bump -bm 1.000000 Glass_Normal.jpg
+
+newmtl Installation
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd installation_Albedo.jpg
+map_Pr installation_Roughness.jpg
+map_Pm installation_Metalness.jpg
+map_Bump -bm 1.000000 installation_Normal.jpg
+
+newmtl Light
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd light_Albedo.jpg
+map_Pr light_Roughness.jpg
+map_Pm light_Metalness.jpg
+map_Ke light_Emissive.jpg
+map_Bump -bm 1.000000 light_Normal.jpg
+
+newmtl Lightswitch
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd LightSwitch_Albedo.jpg
+map_Pr LightSwitch_Roughness.jpg
+map_Pm LightSwitch_Metalness.jpg
+map_Bump -bm 1.000000 LightSwitch_Normal.jpg
+
+newmtl Liquid_Inst
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 0.554079 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.714817 0.141553 0.000000
+Ni 1.450000
+d 0.236090
+illum 9
+
+newmtl Metal_trim
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd metal_trim_Albedo.jpg
+map_Pr metal_trim_Roughness.jpg
+map_Pm metal_trim_Metalness.jpg
+map_Bump -bm 1.000000 Metal_trim_normal.jpg
+
+newmtl Money
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd money_albedo.jpg
+map_Pr money_Roughness.jpg
+map_Bump -bm 1.000000 money_Normal.jpg
+
+newmtl Office_Chair
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Office_Chair_Albedo.jpg
+map_Pr Office_Chair_Roughness.jpg
+map_Pm Office_Chair_Metalness.jpg
+map_Bump -bm 1.000000 Office_Chair_Normal.jpg
+
+newmtl Pistol
+Ka 1.000000 1.000000 1.000000
+Ks 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Colt22_Albedo.jpg
+map_Pr Colt22_Roughness.jpg
+map_Pm Colt22_Metalness.jpg
+map_Bump -bm 1.000000 Colt22_Normal.jpg
+
+newmtl Pistol_Parts
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Colt22_Parts_Albedo.jpg
+map_Pr Colt22_Parts_Roughness.jpg
+map_Pm Colt22_Parts_Metalness.jpg
+map_Bump -bm 1.000000 Colt22_Parts_Normal.jpg
+
+newmtl Roof_tile
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd roof_tile_Albedo.jpg
+map_Pr roof_tile_Roughness.jpg
+map_Bump -bm 1.000000 roof_tile_Normal.jpg
+
+newmtl Scanner
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Scanner_Albedo.jpg
+map_Pr Scanner_Roughness.jpg
+map_Pm Scanner_Metalness.jpg
+map_Ke Scanner_Emissive.jpg
+map_Bump -bm 1.000000 Scanner_Normal.jpg
+
+newmtl Screen
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd screen_A.jpg
+map_Ke screen_A.jpg
+
+newmtl Shark
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Sharkteeth_Albedo.jpg
+map_Pr Sharkteeth_Roughness.jpg
+map_Bump -bm 1.000000 Sharkteeth_Normal.jpg
+
+newmtl Shelf
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Shelf_Albedo.jpg
+map_Pr Shelf_Roughness.jpg
+map_Bump -bm 1.000000 Shelf_Normal.jpg
+
+newmtl Wall_01
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Wall_tile_01_Albedo.jpg
+map_Pr Wall_tile_01_Roughness.jpg
+map_Bump -bm 1.000000 Wall_tile_01_Normal.jpg
+
+newmtl Wall_02
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Wall_02_Albedo.jpg
+map_Pr Wall_02_Roughness.jpg
+map_Bump -bm 1.000000 Wall_02_Normal.jpg
+
+newmtl keyboard
+Ns 1000.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.450000
+illum 2
+map_Kd keyboard.tga
+map_d keyboard.tga
+map_Ke keyboard.tga

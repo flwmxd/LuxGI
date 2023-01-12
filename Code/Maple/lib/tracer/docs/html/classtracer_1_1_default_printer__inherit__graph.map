@@ -1,0 +1,6 @@
+<map id="tracer::DefaultPrinter" name="tracer::DefaultPrinter">
+<area shape="rect" id="node3" href="$classtracer_1_1_file_printer.html" title="Prints file contents when line information is avaliable in the frame. " alt="" coords="5,155,139,181"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_system_info_printer.html" title="Prints additional information before the first stack frame. " alt="" coords="163,155,349,181"/>
+<area shape="rect" id="node2" href="$classtracer_1_1_abstract_printer.html" title="Basic class for all printers. " alt="" coords="81,5,247,32"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_fancy_printer.html" title="Wrapper for both FilePrinter and SystemInfoPrinter. " alt="" coords="90,229,238,256"/>
+</map>

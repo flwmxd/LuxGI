@@ -1,0 +1,90 @@
+---
+Language:        Cpp
+BasedOnStyle:    LLVM
+
+ColumnLimit:      120
+IndentWidth:      2
+TabWidth:         2
+PointerAlignment: Right
+Standard:         Cpp11
+UseTab:           Never
+
+AccessModifierOffset:         -1
+AlignAfterOpenBracket:        true
+AlignConsecutiveAssignments:  true
+AlignConsecutiveDeclarations: true
+AlignEscapedNewlinesLeft:     true
+AlignOperands:                true
+AlignTrailingComments:        true
+
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine:             true
+AllowShortCaseLabelsOnASingleLine:         true
+AllowShortFunctionsOnASingleLine:          All
+AllowShortIfStatementsOnASingleLine:       false
+AllowShortLoopsOnASingleLine:              false
+
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType:           None
+AlwaysBreakBeforeMultilineStrings:    false
+AlwaysBreakTemplateDeclarations:      true
+
+BinPackArguments:  false
+BinPackParameters: false
+
+BreakBeforeBinaryOperators:              None
+BreakBeforeBraces:                       Attach
+BreakBeforeTernaryOperators:             true
+BreakConstructorInitializersBeforeComma: false
+
+CommentPragmas:  '^ IWYU pragma:'
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth:              4
+ContinuationIndentWidth:                        6
+Cpp11BracedListStyle:                           true
+
+DerivePointerAlignment:           false
+ExperimentalAutoDetectBinPacking: false
+ForEachMacros: [ foreach, Q_FOREACH, BOOST_FOREACH ]
+
+IncludeCategories:
+ - Regex: 'tracerDef.hpp|tracer.h'
+   Priority: -1
+ - Regex: '[A-Z][a-zA-Z0-9]*\.hpp'
+   Priority: 10
+ - Regex: '.*'
+   Priority: 20
+
+IndentCaseLabels:                   true
+IndentWrappedFunctionNames:         false
+IndentFunctionDeclarationAfterType: false
+
+KeepEmptyLinesAtTheStartOfBlocks: true
+MaxEmptyLinesToKeep:              4
+
+NamespaceIndentation:        None
+ObjCBlockIndentWidth:        2
+ObjCSpaceAfterProperty:      false
+ObjCSpaceBeforeProtocolList: true
+
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment:                  10000
+PenaltyBreakFirstLessLess:            120
+PenaltyBreakString:                   1000
+PenaltyExcessCharacter:               100
+PenaltyReturnTypeOnItsOwnLine:        200
+
+SpaceAfterCStyleCast:           false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens:              ControlStatements
+SpaceInEmptyParentheses:        false
+SpacesBeforeTrailingComments:   1
+SpacesInAngles:                 false
+SpacesInCStyleCastParentheses:  false
+SpacesInContainerLiterals:      true
+SpacesInParentheses:            false
+SpacesInSquareBrackets:         false
+
+DisableFormat:   false
+...

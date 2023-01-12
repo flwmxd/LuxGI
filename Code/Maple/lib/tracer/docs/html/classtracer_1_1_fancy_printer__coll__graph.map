@@ -1,0 +1,7 @@
+<map id="tracer::FancyPrinter" name="tracer::FancyPrinter">
+<area shape="rect" id="node2" href="$classtracer_1_1_file_printer.html" title="Prints file contents when line information is avaliable in the frame. " alt="" coords="5,247,139,273"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_default_printer.html" title="Gnerates strings from the frame structure. " alt="" coords="83,171,242,197"/>
+<area shape="rect" id="node6" href="$classtracer_1_1_system_info_printer.html" title="Prints additional information before the first stack frame. " alt="" coords="163,247,349,273"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_abstract_printer.html" title="Basic class for all printers. " alt="" coords="80,95,245,121"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_tracer.html" title="Backtrace generator. " alt="" coords="109,5,216,32"/>
+</map>

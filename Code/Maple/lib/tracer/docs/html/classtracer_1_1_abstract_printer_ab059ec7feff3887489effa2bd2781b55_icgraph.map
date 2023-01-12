@@ -1,0 +1,6 @@
+<map id="tracer::AbstractPrinter::setTrace" name="tracer::AbstractPrinter::setTrace">
+<area shape="rect" id="node2" href="$classtracer_1_1_abstract_printer.html#ae3a707d2c7f5f7c072527c878ae1913a" title="Disables colored output (ANSI escape sequences) " alt="" coords="219,5,384,47"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_tracer_handler.html#a7d109d22f3dd18bebb8bf2ae9122fe7f" title="Returns a pointer to the TracerHandler object. " alt="" coords="222,71,381,112"/>
+<area shape="rect" id="node4" href="$tracer_8h.html#a974132af1f7d60eb2d36060b1e735f37" title="Runs tracer::TracerHandler::getTracer()&#45;&gt;defaultSetup();. " alt="" coords="446,53,569,79"/>
+<area shape="rect" id="node5" href="$tracer_8h.html#a4df78184a82c30a8530327e8e977271e" title="Retunrns the handler as a private c struct. " alt="" coords="432,103,583,130"/>
+</map>

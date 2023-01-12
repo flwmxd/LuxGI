@@ -1,0 +1,167 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_ray_tracing : enable
+#extension GL_EXT_ray_query : enable
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "../Raytraced/BlueNoise.glsl"
+#include "../Common/Light.glsl"
+#include "../Common/Math.glsl"
+
+//work group perfectly fits 32 rays
+
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, r32ui) uniform uimage2D outColor;
+
+layout(set = 0, binding = 1) uniform sampler2D uNormalSampler;
+layout(set = 0, binding = 2) uniform sampler2D uDepthSampler;
+layout(set = 0, binding = 3) uniform sampler2D uSobolSequence;
+layout(set = 0, binding = 4) uniform sampler2D uScramblingRankingTile;
+layout(set = 0, binding = 5) uniform UniformBufferObject
+{
+    Light light;
+    mat4 viewProjInv;
+}ubo;
+
+layout(set = 0, binding = 6) uniform accelerationStructureEXT uTopLevelAS;
+
+layout(push_constant) uniform PushConstants
+{
+    float bias;
+    uint  numFrames;
+}pushConsts;
+
+#include "../Raytraced/RayQuery.glsl"
+
+
+vec2 nextSample(ivec2 coord)
+{
+    return vec2(sampleBlueNoise(coord, int(pushConsts.numFrames), 0, uSobolSequence, uScramblingRankingTile),
+                sampleBlueNoise(coord, int(pushConsts.numFrames), 1, uSobolSequence, uScramblingRankingTile));
+}
+
+
+shared uint gVisibility;
+
+
+void fetchLight(in Light light, vec3 worldPos, vec3 normal, vec2 random, out vec3 Wi, out float tmax, out float attenuation, bool softShadow)
+{
+    vec3 lightDir = vec3(0,0,0);
+    float lightRadius = 0;
+
+	if (light.type == LIGHT_DIRECTIONAL)
+    {
+        lightDir = -light.direction.xyz;
+        tmax = 10000.0f;
+        Wi = lightDir;
+
+        if(softShadow)
+        {
+            lightRadius = light.direction.w;
+        }
+        attenuation = 1.0;
+    } 
+    else if(light.type == LIGHT_POINT)
+    {
+        // Vector to light
+        vec3 dir = light.position.xyz - worldPos;
+        // Distance from light to fragment position
+        float dist = length(dir);
+        // Light to fragment
+        lightDir = normalize(dir);
+        // Attenuation
+        attenuation = 1.f;// light.radius / (pow(dist, 2.0) + 1.0);
+        Wi = lightDir;
+        tmax = dist;
+        if(softShadow)
+        {
+            // calculate disk point
+            lightRadius = light.direction.w / dist;  
+        }
+    }
+    else if(light.type == LIGHT_SPOT)
+    {
+        vec3 L = light.position.xyz -  worldPos;
+        float cutoffAngle   = 1.0f - light.angle;      
+        lightDir            = normalize(L);
+        float dist          = length(L);
+        float theta         = dot(lightDir.xyz, light.direction.xyz);
+        float epsilon       = cutoffAngle - cutoffAngle * 0.9f;
+        attenuation 	    = ((theta - cutoffAngle) / epsilon); // atteunate when approaching the outer cone
+        attenuation         *= light.radius / (pow(dist, 2.0) + 1.0);//saturate(1.0f - dist / light.range);
+        attenuation         = clamp(attenuation, 0.0, 1.0);
+
+        Wi = lightDir;
+        tmax = dist;
+
+        if(softShadow)
+        {
+            lightRadius = light.direction.w / dist;  
+        }
+    }
+
+    if(softShadow)
+    {
+        vec3 lightTangent   = normalize(cross(lightDir, vec3(0.0f, 1.0f, 0.0f)));
+        vec3 lightBitangent = normalize(cross(lightTangent, lightDir));
+        // calculate disk point
+        float pointRadius = lightRadius * sqrt(random.x);
+        float pointAngle  = random.y * 2.0f * PI;
+        vec2  diskPoint   = vec2(pointRadius * cos(pointAngle), pointRadius * sin(pointAngle));    
+        Wi = normalize(lightDir + diskPoint.x * lightTangent + diskPoint.y * lightBitangent);
+    }
+   
+    attenuation *= clamp(dot(normal, Wi), 0.0, 1.0);
+}
+
+
+void main()
+{
+    if (gl_LocalInvocationIndex == 0)
+        gVisibility = 0;
+
+    barrier();
+
+    const ivec2 size          = textureSize(uDepthSampler, 0);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    const vec2  pixelCenter  = vec2(currentCoord) + vec2(0.5);
+    const vec2  texCoord     = pixelCenter / vec2(size);
+
+    uint result = 0;
+
+    float depth = texture(uDepthSampler,texCoord).r;
+
+    if (depth != 1.0f)
+    {
+        vec3 worldPos  = worldPositionFromDepth(texCoord,depth,ubo.viewProjInv);
+        //texture(uPositionSampler,texCoord).xyz;
+        vec3 normal    = octohedralToDirection(texture(uNormalSampler,texCoord).xy);
+
+        vec3 rayOrigin = worldPos + normal * pushConsts.bias;
+
+        vec2 rndSample = nextSample(currentCoord);
+
+        vec3  Wi;
+        float tMax;
+        float attenuation;
+
+        fetchLight(ubo.light, worldPos, normal, rndSample, Wi, tMax, attenuation,true);
+
+        if (attenuation > 0.0f)
+            result = uint(queryDistance(rayOrigin, Wi, tMax,uTopLevelAS));
+    }
+
+    atomicOr(gVisibility, result << gl_LocalInvocationIndex);// 0 - 31
+    barrier();
+    //because of ray hit is true or false, so we can use bitwise to do.
+    //for every workgroup is 4 * 8 = 32 bit, so we can use 4 * 8 as a group to pack 32 rays.
+    if (gl_LocalInvocationIndex == 0)
+        imageStore(outColor, ivec2(gl_WorkGroupID.xy), uvec4(gVisibility));
+}
+
+// ------------------------------------------------------------------

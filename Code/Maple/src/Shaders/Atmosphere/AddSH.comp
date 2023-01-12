@@ -1,0 +1,70 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#define LOCAL_SIZE 8
+#define ENVIRONMENT_MAP_SIZE 128
+#define SH_INTERMEDIATE_SIZE 16
+#define NUM_CUBEMAP_FACES 6
+
+const float Pi = 3.141592654;
+
+layout(local_size_x = 1, local_size_y = SH_INTERMEDIATE_SIZE, local_size_z = NUM_CUBEMAP_FACES) in;
+
+layout(binding = 0, rgba32f) uniform image2D outColor;
+ 
+layout(binding = 1) uniform sampler2DArray uSHIntermediate;
+
+shared vec3  shCoeffs[SH_INTERMEDIATE_SIZE][NUM_CUBEMAP_FACES];
+shared float globalWeights[SH_INTERMEDIATE_SIZE][NUM_CUBEMAP_FACES];
+
+
+void main()
+{
+    shCoeffs[gl_GlobalInvocationID.y][gl_GlobalInvocationID.z] = vec3(0.0);
+    globalWeights[gl_GlobalInvocationID.y][gl_GlobalInvocationID.z]   = 0.0;
+
+    barrier();
+
+    // Add up coefficients along X axis.
+    for (uint i = 0; i < SH_INTERMEDIATE_SIZE; i++)
+    {
+        ivec3 p   = ivec3(gl_GlobalInvocationID.x * SH_INTERMEDIATE_SIZE + i, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
+        vec4  val = texelFetch(uSHIntermediate, p, 0);
+
+        shCoeffs[gl_GlobalInvocationID.y][gl_GlobalInvocationID.z] += val.rgb;
+        globalWeights[gl_GlobalInvocationID.y][gl_GlobalInvocationID.z] += val.a;
+    }
+
+    barrier();
+
+    if (gl_GlobalInvocationID.z == 0)
+    {
+        // Add up coefficients along Z axis.
+        for (uint i = 1; i < NUM_CUBEMAP_FACES; i++)
+        {
+            shCoeffs[gl_GlobalInvocationID.y][0] += shCoeffs[gl_GlobalInvocationID.y][i];
+            globalWeights[gl_GlobalInvocationID.y][0] += globalWeights[gl_GlobalInvocationID.y][i];
+        }
+    }
+
+    barrier();
+
+    if (gl_GlobalInvocationID.y == 0 && gl_GlobalInvocationID.z == 0)
+    {
+        // Add up coefficients along Y axis.
+        for (uint i = 1; i < SH_INTERMEDIATE_SIZE; i++)
+        {
+            shCoeffs[0][0] += shCoeffs[i][0];
+            globalWeights[0][0] += globalWeights[i][0];
+        }
+
+        float scale = (4.0 * Pi) / globalWeights[0][0];
+
+        // Write out the coefficents.
+        imageStore(outColor, ivec2(gl_GlobalInvocationID.x, 0), vec4(shCoeffs[0][0] * scale, globalWeights[0][0]));
+    }
+}
+
+// ------------------------------------------------------------------

@@ -1,0 +1,134 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#extension GL_GOOGLE_include_directive : require
+
+#include "../Raytraced/EdgeStop.glsl"
+#include "../Common/Math.glsl"
+#include "ReflectionCommon.glsl"
+
+#define NUM_THREADS_X 8
+#define NUM_THREADS_Y 8
+
+layout(local_size_x = NUM_THREADS_X, local_size_y = NUM_THREADS_Y, local_size_z = 1) in;
+
+
+layout(set = 0, binding = 0, rgba16f) uniform writeonly image2D outColor;
+
+layout(set = 1, binding = 0) uniform sampler2D uNormalSampler;
+layout(set = 1, binding = 1) uniform sampler2D uPBRSampler;
+
+//the first time(i is zero) set the accumulation's output as current input
+layout(set = 2, binding = 0) uniform sampler2D uInput;
+
+layout(set = 3, binding = 0, std430) buffer DenoiseTileData
+{
+    ivec2 coord[];
+}denoiseTileData;
+
+layout(push_constant) uniform PushConstants
+{
+    int   radius;
+    int   stepSize;
+    float phiColor;
+    float phiNormal;
+    float sigmaDepth;
+    int   approximateWithDDGI;
+}pushConstants;
+
+float computeVarianceCenter(ivec2 ipos)
+{
+    float sum = 0.0f;
+
+    const float kernel[2][2] = {
+        { 1.0 / 4.0, 1.0 / 8.0 },
+        { 1.0 / 8.0, 1.0 / 16.0 }
+    };
+
+    const int radius = 1;
+    for (int yy = -radius; yy <= radius; yy++)
+    {
+        for (int xx = -radius; xx <= radius; xx++)
+        {
+            ivec2 p = ipos + ivec2(xx, yy);
+            float k = kernel[abs(xx)][abs(yy)];
+            sum += texelFetch(uInput, p, 0).a * k;
+        }
+    }
+    return sum;
+}
+
+void main()
+{
+    ivec2       size = textureSize(uNormalSampler, 0);
+    const ivec2 ipos = denoiseTileData.coord[gl_WorkGroupID.x] + ivec2(gl_LocalInvocationID.xy);
+
+    const float epsVariance      = 1e-10;
+    const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
+
+    const vec4 centerColor = texelFetch(uInput, ipos, 0);
+    const float centerLuma = luminance(centerColor.rgb);
+
+    const float var = computeVarianceCenter(ipos);
+
+    vec4 normal = texelFetch(uNormalSampler, ipos, 0);
+    float centerDepth = texelFetch(uPBRSampler, ipos, 0).a;
+    float roughness   = texelFetch(uPBRSampler, ipos, 0).g;
+
+   if (centerDepth == 1.0f)
+    {
+        imageStore(outColor, ipos, vec4(0.0f));
+        return;
+    }
+    else if (roughness <= MIRROR_REFLECTIONS_ROUGHNESS_THRESHOLD || 
+             roughness >= DDGI_REFLECTIONS_ROUGHNESS_THRESHOLD)
+    {
+        imageStore(outColor, ipos, centerColor);
+        return;
+    }
+
+    const float phiColor = pushConstants.phiColor * sqrt(max(0.0, var.r)) + epsVariance;
+
+    float sumWeightColor = 1.0;
+    vec4  sumColor   = centerColor;
+
+    for (int yy = -pushConstants.radius; yy <= pushConstants.radius; yy++)
+    {
+        for (int xx = -pushConstants.radius; xx <= pushConstants.radius; xx++)
+        {
+            const ivec2 p      = ipos + ivec2(xx, yy) * pushConstants.stepSize;
+            const bool  inside = all(greaterThanEqual(p, ivec2(0, 0))) && all(lessThan(p, size));
+            const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
+
+            if (inside && (xx != 0 || yy != 0))
+            {
+                const vec4 sampleColor = texelFetch(uInput, p, 0);
+                const float sampleLuma = luminance(sampleColor.rgb);
+
+                vec4 sampleNormal = texelFetch(uNormalSampler, p, 0);
+                float depth = texelFetch(uPBRSampler, p, 0).a;
+
+                // compute the edge-stopping functions
+                const float w = computeEdgeStoppingWeight(centerDepth,
+                                                             depth,
+                                                             pushConstants.sigmaDepth,
+                                                             octohedralToDirection(normal.xy),
+                                                             octohedralToDirection(sampleNormal.xy),
+                                                             pushConstants.phiNormal,
+                                                             centerLuma,
+                                                             sampleLuma,
+                                                             phiColor);
+
+                const float wVisibility = w * kernel;
+
+                sumWeightColor += wVisibility;
+                sumColor += vec4(vec3(wVisibility), wVisibility * wVisibility) * sampleColor;
+            }
+        }
+    }
+
+    vec4 outC = sumColor / vec4(vec3(sumWeightColor), sumWeightColor *sumWeightColor);
+    imageStore(outColor, ipos, outC);
+}

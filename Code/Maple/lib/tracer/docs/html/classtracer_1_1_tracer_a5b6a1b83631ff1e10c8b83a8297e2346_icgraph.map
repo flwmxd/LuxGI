@@ -1,0 +1,6 @@
+<map id="tracer::Tracer::trace" name="tracer::Tracer::trace">
+<area shape="rect" id="node2" href="$tracer_8h.html#a888ca5cb9059f17addb6428c005bbe8c" title="Wrapper for tracer::Tracer::trace. " alt="" coords="218,5,343,32"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_tracer_handler.html#a7d109d22f3dd18bebb8bf2ae9122fe7f" title="Returns a pointer to the TracerHandler object. " alt="" coords="201,57,360,98"/>
+<area shape="rect" id="node4" href="$tracer_8h.html#a974132af1f7d60eb2d36060b1e735f37" title="Runs tracer::TracerHandler::getTracer()&#45;&gt;defaultSetup();. " alt="" coords="422,39,545,65"/>
+<area shape="rect" id="node5" href="$tracer_8h.html#a4df78184a82c30a8530327e8e977271e" title="Retunrns the handler as a private c struct. " alt="" coords="408,89,559,116"/>
+</map>

@@ -1,0 +1,8 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classtracer_1_1_abstract_debug_info.html" title="Base class for all debug information generators. " alt="" coords="5,107,195,133"/>
+<area shape="rect" id="node2" href="$classtracer_1_1_debug_info_b_f_d.html" title="Generates debug information using libbfd. " alt="" coords="257,5,418,32"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_debug_info_dummy.html" title="Dummy debug information &quot;generator&quot;. " alt="" coords="244,56,431,83"/>
+<area shape="rect" id="node4" href="$classtracer_1_1_debug_info_d_w_f_l.html" title="Debug information generator based on libdwfl. " alt="" coords="251,107,423,133"/>
+<area shape="rect" id="node5" href="$classtracer_1_1_debug_info_external_fallback.html" title="Uses the addr2line system tool (hopefully) installed on the system. " alt="" coords="243,158,432,199"/>
+<area shape="rect" id="node6" href="$classtracer_1_1_debug_info_w_i_n32.html" title="Debug indormation based on the WIN32 API. " alt="" coords="248,224,427,251"/>
+</map>

@@ -1,0 +1,60 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 460
+
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : require
+
+#include "DDGICommon.glsl"
+#include "../Common/Math.glsl"
+
+#define NUM_THREADS_X 32
+#define NUM_THREADS_Y 32
+
+layout(local_size_x = NUM_THREADS_X, local_size_y = NUM_THREADS_Y, local_size_z = 1) in;
+
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D outColor;
+layout(set = 0, binding = 1) uniform sampler2D uIrradiance;
+layout(set = 0, binding = 2) uniform sampler2D uDepth;
+layout(set = 0, binding = 3, scalar) uniform DDGIUBO
+{
+    DDGIUniform ddgi;
+};
+
+layout(set = 0, binding = 4) uniform sampler2D uDepthSampler;
+layout(set = 0, binding = 5) uniform sampler2D uNormalSampler;
+layout(set = 0, binding = 6) uniform UniformBufferObject
+{
+    vec4  cameraPosition;
+    mat4 viewProjInv;
+}ubo;
+
+const float FLT_EPS = 0.00000001;
+
+void main()
+{
+    const ivec2 size          = textureSize(uDepthSampler,0);
+    const vec2  texelSize    = vec2(1.0f) / vec2(size);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    const vec2  pixelCenter  = vec2(currentCoord) + vec2(0.5);
+    const vec2  texCoord     = pixelCenter / vec2(size);
+
+    float depth = texelFetch(uDepthSampler, currentCoord, 0).r;
+
+    if (depth == 1.0f)
+    {
+        imageStore(outColor, currentCoord, vec4(0.0f));
+        return;
+    }
+
+    const vec3 P  = worldPositionFromDepth(texCoord,texelFetch(uDepthSampler,currentCoord,0).r,ubo.viewProjInv);
+ 
+    const vec3 N  = octohedralToDirection(texelFetch(uNormalSampler, currentCoord, 0).xy);
+    const vec3 Wo = normalize(ubo.cameraPosition.xyz - P);
+
+    vec3 irradiance = sampleIrradiance(ddgi, P, N, Wo, uIrradiance, uDepth);
+
+    imageStore(outColor, currentCoord, vec4(irradiance, 1.0f));
+}

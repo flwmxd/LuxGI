@@ -1,0 +1,4 @@
+<map id="tracer::Tracer::trace" name="tracer::Tracer::trace">
+<area shape="rect" id="node2" href="$classtracer_1_1_abstract_tracer.html#a5639ae164714fe080045f22f33f63dec" title="Generates the backtrace. " alt="" coords="215,5,377,47"/>
+<area shape="rect" id="node3" href="$classtracer_1_1_abstract_debug_info.html#a7a851d1aaf189e90888b807bd306da52" title="Generates the debug information. " alt="" coords="201,71,391,112"/>
+</map>
