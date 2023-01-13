@@ -7,8 +7,10 @@
 
 The project is a Hybrid GI solution, partly inspired by Lumen and DDGI. The main core idea is to provide a complete GI solution (including Indirect-Light, Infinite-Bounce, Emissive-Lighting, Glossy-Reflection, Shadow, AO) that can run on both Raytracing-supported and non-raytracing hardware. Due to the shortage of time, there are still some performance issues in this project, but as a throwaway, I believe it can provide some new ideas to most of the people who are interested in GI.
 
-</div>
+![Overview](./images/Main-Page.png)
 
+***Left is SDF-On, Right is Raytracing-On***
+</div>
 
 
 ![Overview](./images/overview.png)
