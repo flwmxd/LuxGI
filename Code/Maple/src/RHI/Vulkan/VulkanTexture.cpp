@@ -25,7 +25,9 @@ namespace maple
 
 	namespace tools
 	{
-		inline auto generateMipmaps(VkImage image, VkFormat imageFormat, uint32_t texWidth, uint32_t texHeight, uint32_t depth, uint32_t mipLevels, uint32_t faces = 1, VkCommandBuffer commandBuffer = nullptr, VkImageLayout initLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) -> void
+		inline auto generateMipmaps(VkImage image, VkFormat imageFormat, uint32_t texWidth, uint32_t texHeight, uint32_t depth, uint32_t mipLevels, uint32_t faces = 1, 
+			VkCommandBuffer commandBuffer = nullptr, VkImageLayout initLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, bool depthBuffer = false
+		) -> void
 		{
 			VkFormatProperties formatProperties;
 			vkGetPhysicalDeviceFormatProperties(*VulkanDevice::get()->getPhysicalDevice(), imageFormat, &formatProperties);
@@ -48,7 +50,7 @@ namespace maple
 			barrier.image                           = image;
 			barrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
 			barrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-			barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.aspectMask     = depthBuffer ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 			barrier.subresourceRange.baseArrayLayer = 0;
 			barrier.subresourceRange.layerCount     = 1;
 			barrier.subresourceRange.levelCount     = 1;
@@ -78,7 +80,7 @@ namespace maple
 					VkImageBlit blit{};
 					blit.srcOffsets[0]                 = {0, 0, 0};
 					blit.srcOffsets[1]                 = {int32_t(texWidth >> (i - 1)), int32_t(texHeight >> (i - 1)), depth > 1 ? int32_t(depth >> (i - 1)) : 1};
-					blit.srcSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+					blit.srcSubresource.aspectMask     = depthBuffer ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 					blit.srcSubresource.mipLevel       = i - 1;
 					blit.srcSubresource.baseArrayLayer = face;
 					blit.srcSubresource.layerCount     = 1;
@@ -90,7 +92,7 @@ namespace maple
 					    std::max(int32_t(texHeight >> i), 1),
 					    depth > 1 ? int32_t(depth >> i) : 1};
 
-					blit.dstSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+					blit.dstSubresource.aspectMask     = depthBuffer ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 					blit.dstSubresource.mipLevel       = i;
 					blit.dstSubresource.baseArrayLayer = face;
 					blit.dstSubresource.layerCount     = 1;
@@ -102,7 +104,7 @@ namespace maple
 					               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					               1,
 					               &blit,
-					               VK_FILTER_LINEAR);
+					               depthBuffer ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
 
 					barrier.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 					barrier.newLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -255,6 +257,18 @@ namespace maple
 		transitionImage(oldLayout);
 	}
 
+	auto VulkanTexture2D::getImageFboView() -> VkImageView
+	{
+		if (mipLevels <= 1)
+			return textureImageView;
+
+		if (textureFboImageView == nullptr)
+		{
+			textureFboImageView = VulkanHelper::createImageView(textureImage, vkFormat, 1, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+		}
+		return textureFboImageView;
+	}
+
 	auto VulkanTexture2D::load() -> bool
 	{
 		PROFILE_FUNCTION();
@@ -328,7 +342,7 @@ namespace maple
 		deleteImage  = true;
 		mipLevels    = 1;
 
-		if (loadOptions.generateMipMaps)
+		if (loadOptions.generateMipMaps || mipmap)
 		{
 			mipLevels = loadOptions.maxMipMaps == -1 ? static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1 : loadOptions.maxMipMaps;
 		}
@@ -437,6 +451,18 @@ namespace maple
 		VulkanHelper::setObjectName("ImageView:" + name, (uint64_t) textureImageView, VK_OBJECT_TYPE_IMAGE_VIEW);
 	}
 
+	auto VulkanTexture2D::generateMipmaps(const CommandBuffer *cmd) -> void
+	{
+		if (mipLevels > 1)
+		{
+			auto vkCmd     = ((VulkanCommandBuffer *) cmd);
+			auto oldLayout = imageLayout;
+			transitionImage(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vkCmd);
+			tools::generateMipmaps(textureImage, vkFormat, width, height, 1, mipLevels, 1, vkCmd->getCommandBuffer());
+			transitionImage(oldLayout, vkCmd);
+		}
+	}
+
 	auto VulkanTexture2D::createSampler() -> void
 	{
 		PROFILE_FUNCTION();
@@ -475,6 +501,14 @@ namespace maple
 		{
 			auto imageView = textureImageView;
 			deletionQueue.emplace([imageView] { vkDestroyImageView(*VulkanDevice::get(), imageView, nullptr); });
+			textureImageView = nullptr;
+		}
+
+		if (textureFboImageView)
+		{
+			auto imageView = textureFboImageView;
+			deletionQueue.emplace([imageView] { vkDestroyImageView(*VulkanDevice::get(), imageView, nullptr); });
+			textureFboImageView = nullptr;
 		}
 
 		if (deleteImage)
@@ -530,6 +564,16 @@ namespace maple
 			});
 		}
 
+		if (textureFboImageView)
+		{
+			auto imageView = textureFboImageView;
+			deletionQueue.emplace([imageView]() {
+				auto device = VulkanDevice::get();
+				vkDestroyImageView(*device, imageView, nullptr);
+			});
+			textureFboImageView = nullptr;
+		}
+
 #ifdef USE_VMA_ALLOCATOR
 		auto image = textureImage;
 		auto alloc = allocation;
@@ -547,13 +591,26 @@ namespace maple
 #endif
 	}
 
-	auto VulkanTextureDepth::resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer) -> void
+	auto VulkanTextureDepth::resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer, int32_t mipmap) -> void
 	{
 		PROFILE_FUNCTION();
 		this->width  = width;
 		this->height = height;
+		mipmapLevel  = mipmap;
 		release();
 		init(commandBuffer);
+	}
+
+	auto VulkanTextureDepth::getImageFboView() -> VkImageView
+	{
+		if (mipmapLevel <= 1)
+			return textureImageView;
+
+		if (textureFboImageView == nullptr)
+		{
+			textureFboImageView = VulkanHelper::createImageView(textureImage, vkFormat, 1, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+		}
+		return textureFboImageView;
 	}
 
 	auto VulkanTextureDepth::updateDescriptor() -> void
@@ -571,6 +628,18 @@ namespace maple
 		VulkanHelper::setObjectName("ImageView:" + name, (uint64_t) textureImageView, VK_OBJECT_TYPE_IMAGE_VIEW);
 	}
 
+	auto VulkanTextureDepth::generateMipmaps(const CommandBuffer *cmd) -> void
+	{
+		if (mipmapLevel > 1)
+		{
+			auto vkCmd     = ((VulkanCommandBuffer *) cmd);
+			auto oldLayout = imageLayout;
+			transitionImage(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vkCmd);
+			tools::generateMipmaps(textureImage, vkFormat, width, height, 1, mipmapLevel, 1, vkCmd->getCommandBuffer(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,true);
+			transitionImage(oldLayout, vkCmd);
+		}
+	}
+
 	auto VulkanTextureDepth::init(const CommandBuffer *commandBuffer) -> void
 	{
 		PROFILE_FUNCTION();
@@ -578,16 +647,16 @@ namespace maple
 		format   = TextureFormat::DEPTH;
 
 #ifdef USE_VMA_ALLOCATOR
-		VulkanHelper::createImage(width, height, 1, vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, 1, 0, allocation);
+		VulkanHelper::createImage(width, height, mipmapLevel, vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, 1, 0, allocation);
 #else
-		VulkanHelper::createImage(width, height, 1, vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, 1, 0);
+		VulkanHelper::createImage(width, height, mipmapLevel, vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, 1, 0);
 #endif
 
-		textureImageView = VulkanHelper::createImageView(textureImage, vkFormat, 1, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+		textureImageView = VulkanHelper::createImageView(textureImage, vkFormat, mipmapLevel, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
 		transitionImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, (VulkanCommandBuffer *) commandBuffer);
 
-		textureSampler = VulkanHelper::createTextureSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR, 0.0f, 1.0f, true,
+		textureSampler = VulkanHelper::createTextureSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR, 0.0f, mipmapLevel, true,
 		                                                    VulkanDevice::get()->getPhysicalDevice()->getProperties().limits.maxSamplerAnisotropy,
 		                                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		                                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -606,7 +675,7 @@ namespace maple
 
 		if (newLayout != imageLayout)
 		{
-			VulkanHelper::transitionImageLayout(textureImage, vkFormat, imageLayout, newLayout, 1, 1, commandBuffer);
+			VulkanHelper::transitionImageLayout(textureImage, vkFormat, imageLayout, newLayout, mipmapLevel, 1, commandBuffer);
 		}
 		imageLayout = newLayout;
 		updateDescriptor();

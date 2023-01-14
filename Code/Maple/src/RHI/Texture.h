@@ -129,6 +129,8 @@ namespace maple
 
 		virtual auto buildTexture(TextureFormat internalformat, uint32_t width, uint32_t height, bool srgb = false, bool depth = false, bool samplerShadow = false, bool mipmap = false, bool image = false, uint32_t accessFlag = 0) -> void = 0;
 
+		virtual auto generateMipmaps(const CommandBuffer *cmd) -> void{};
+
 		inline auto getType() const -> TextureType override
 		{
 			return TextureType::Color;
@@ -208,7 +210,8 @@ namespace maple
 		{
 			return TextureType::Depth;
 		};
-		virtual auto resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer = nullptr) -> void = 0;
+		virtual auto generateMipmaps(const CommandBuffer *cmd) -> void{};
+		virtual auto resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer = nullptr, int32_t mipmap = 1) -> void = 0;
 	};
 
 	class MAPLE_EXPORT TextureDepthArray : public Texture

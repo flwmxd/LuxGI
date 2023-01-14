@@ -34,11 +34,11 @@ namespace maple::sdf
 {
 	namespace
 	{
-		constexpr int32_t  GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION = 40;        // Amount of chunks (in each direction) to split atlas draw distance for objects culling
+		constexpr int32_t  GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION = 40;
 		constexpr int32_t  GLOBAL_SURFACE_ATLAS_CHUNKS_GROUP_SIZE = 4;
 		constexpr int32_t  CHUNK_CACHE_SIZE = GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION * GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION * GLOBAL_SURFACE_ATLAS_CHUNKS_RESOLUTION;
 		constexpr uint16_t GLOBAL_SURFACE_ATLAS_TILE_SIZE_MIN = 32;        // The minimum size of the tile
-		constexpr uint16_t GLOBAL_SURFACE_ATLAS_TILE_SIZE_MAX = 256;        // The maximum size of the tile
+		constexpr uint16_t GLOBAL_SURFACE_ATLAS_TILE_SIZE_MAX = 128;        // The maximum size of the tile
 		constexpr bool     GLOBAL_SURFACE_ATLAS_DEBUG_FORCE_REDRAW_TILES = false;
 		constexpr float    GLOBAL_SURFACE_ATLAS_TILE_PADDING = 1.f;
 		constexpr float    GLOBAL_SURFACE_ATLAS_TILE_PROJ_PLANE_OFFSET = 0.1f;
@@ -61,14 +61,14 @@ namespace maple::sdf
 			glm::vec4  objectBounds;
 			uint32_t   tileOffset[6];
 			glm::ivec2 padding;
-			glm::mat4  transform;        //without scaling...  //4 * vec3
+			glm::mat4  transform; 
 			glm::vec4  extends;
 		};
 
 		struct TileBuffer
 		{
 			glm::vec4 extends;
-			glm::mat4 transform;        //without scaling...  //4 * vec3
+			glm::mat4 transform;
 			glm::vec4 objectBounds;
 		};
 	}        // namespace
@@ -88,7 +88,7 @@ namespace maple::sdf
 		{
 			struct GlobalSurface
 			{
-				uint32_t resolution = 8192;
+				uint32_t resolution = 4096;
 
 				bool dirty = true;
 				bool allLightingDirty = false;
@@ -164,7 +164,7 @@ namespace maple::sdf
 
 				for (int32_t tileIndex = 0; tileIndex < 6; tileIndex++)
 				{
-					auto boundsSizeTile = atlas.obb.getExtends() * 2.f * transform.getWorldScale();   
+					auto boundsSizeTile = atlas.obb.getExtends() * 2.f * transform.getWorldScale();
 					auto abs = glm::abs(boundsSizeTile);
 
 					uint16_t tileResolution = (uint16_t)(math::max3(abs) * tilesScale);
@@ -490,7 +490,7 @@ namespace maple::sdf
 				{
 					ImGui::Columns(2);
 					ImGuiHelper::property("Shadow Bias(Lighting Cache)", surface.shadowBias, 0.f, 15.f);
-				
+
 					ImGuiHelper::showProperty("ObjectsBufferCapacity", std::to_string(surface.objectsBufferCapacity));
 
 					ImGui::Columns(1);
@@ -796,7 +796,7 @@ namespace maple::sdf
 			{
 				if (surfacePublic.ssboTileBuffer == nullptr)
 					return false;
-				
+
 				auto group = registry.getRegistry().view<
 					maple::component::MeshRenderer,
 					maple::component::Transform,

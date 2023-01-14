@@ -94,6 +94,9 @@ namespace maple
 		{
 			return textureImageView;
 		}
+
+		auto getImageFboView() -> VkImageView;
+
 		inline auto getSampler() const
 		{
 			return textureSampler;
@@ -125,6 +128,7 @@ namespace maple
 		{
 			imageLayout = layout;
 		}
+		auto generateMipmaps(const CommandBuffer *cmd) -> void override;
 
 	  private:
 		auto createSampler() -> void;
@@ -147,11 +151,12 @@ namespace maple
 		TextureParameters  parameters;
 		TextureLoadOptions loadOptions;
 
-		VkImage               textureImage       = VK_NULL_HANDLE;
-		VkImageView           textureImageView   = VK_NULL_HANDLE;
-		VkDeviceMemory        textureImageMemory = VK_NULL_HANDLE;
-		VkSampler             textureSampler     = VK_NULL_HANDLE;
-		VkImageLayout         imageLayout        = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImage               textureImage        = VK_NULL_HANDLE;
+		VkImageView           textureImageView    = VK_NULL_HANDLE;
+		VkImageView           textureFboImageView = VK_NULL_HANDLE;
+		VkDeviceMemory        textureImageMemory  = VK_NULL_HANDLE;
+		VkSampler             textureSampler      = VK_NULL_HANDLE;
+		VkImageLayout         imageLayout         = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkDescriptorImageInfo descriptor{};
 
 		std::unordered_map<uint32_t, VkImageView> mipImageViews;
@@ -169,7 +174,7 @@ namespace maple
 
 		auto bind(uint32_t slot = 0) const -> void override{};
 		auto unbind(uint32_t slot = 0) const -> void override{};
-		auto resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer) -> void override;
+		auto resize(uint32_t width, uint32_t height, const CommandBuffer *commandBuffer, int32_t mipmap) -> void override;
 
 		auto transitionImage(VkImageLayout newLayout, const VulkanCommandBuffer *commandBuffer = nullptr) -> void override;
 
@@ -210,6 +215,9 @@ namespace maple
 		{
 			return textureImageView;
 		}
+
+		auto getImageFboView() -> VkImageView;
+
 		inline const auto getSampler() const
 		{
 			return textureSampler;
@@ -245,6 +253,7 @@ namespace maple
 		{
 			imageLayout = layout;
 		}
+		auto generateMipmaps(const CommandBuffer *cmd) -> void override;
 
 	  protected:
 		auto init(const CommandBuffer *commandBuffer = nullptr) -> void;
@@ -255,12 +264,14 @@ namespace maple
 		uint32_t              width   = 0;
 		uint32_t              height  = 0;
 		uint32_t              handle{};
-		TextureFormat         format = TextureFormat::DEPTH;
+		int32_t               mipmapLevel = 1;
+		TextureFormat         format      = TextureFormat::DEPTH;
 		VkFormat              vkFormat;
 		VkImageLayout         imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkImage               textureImage{};
 		VkDeviceMemory        textureImageMemory{};
 		VkImageView           textureImageView{};
+		VkImageView           textureFboImageView{};
 		VkSampler             textureSampler{};
 		VkDescriptorImageInfo descriptor{};
 #ifdef USE_VMA_ALLOCATOR
@@ -527,7 +538,7 @@ namespace maple
 		auto buildTexture3D(TextureFormat format, uint32_t width, uint32_t height, uint32_t depth) -> void override;
 
 		auto updateMipmap(const CommandBuffer *cmd, uint32_t mipLevel, const void *buffer) -> void override;
-		
+
 		auto update(const CommandBuffer *cmd, const void *buffer, uint32_t x = 0, uint32_t y = 0, uint32_t z = 0) -> void override;
 
 		virtual auto getFilePath() const -> const std::string & override

@@ -220,6 +220,8 @@ namespace maple
 		VulkanHelper::endSingleTimeCommands(commandBuffer);
 	}
 
+	#pragma optimize("",off)
+
 	auto VulkanCommandBuffer::executeInternal(const std::vector<VkPipelineStageFlags> &flags,
 	                                          const std::vector<VkSemaphore> &         waitSemaphores,
 	                                          const std::vector<VkSemaphore> &         signalSemaphores,

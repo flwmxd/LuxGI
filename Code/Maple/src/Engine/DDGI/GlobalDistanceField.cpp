@@ -462,7 +462,7 @@ namespace maple::sdf
 		}
 	}        // namespace on_imgui
 
-	namespace merge_CONSTS_sdf
+	namespace merge_sdf
 	{
 		// how many distance represented in a voxel.
 		inline auto chunkCalculate(
@@ -888,7 +888,7 @@ namespace maple::sdf
 			});
 		builder->registerGlobalComponent<global::component::GlobalDistanceFieldPublic>();
 		builder->registerWithinQueue<generate_sdf::system>(render);
-		builder->registerWithinQueue<merge_CONSTS_sdf::system>(render);
+		builder->registerWithinQueue<merge_sdf::system>(render);
 		builder->registerWithinQueue<on_scene_changed::system>(begin);
 		builder->registerOnImGui<on_imgui::system>();
 	}

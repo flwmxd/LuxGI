@@ -118,8 +118,8 @@ namespace maple
 	{
 		PROFILE_FUNCTION();
 
-		std::vector<DescriptorPoolInfo> poolInfos = {{DescriptorType::Image, 4096},
-		                                             {DescriptorType::ImageSampler, 4096},
+		std::vector<DescriptorPoolInfo> poolInfos = {{DescriptorType::Image, 500},
+		                                             {DescriptorType::ImageSampler, 500},
 		                                             {DescriptorType::Buffer, 500},
 		                                             {DescriptorType::BufferDynamic, 500},
 		                                             {DescriptorType::UniformBuffer, 500},
