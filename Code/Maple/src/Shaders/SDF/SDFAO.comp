@@ -1,0 +1,61 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "../Common/Light.glsl"
+#include "../Common/Math.glsl"
+#include "../Raytraced/BlueNoise.glsl"
+#include "../SDF/AtlasCommon.glsl"
+#include "../SDF/SDFCommon.glsl"
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, r8) uniform image2D outColor;
+
+layout(set = 0, binding = 1) uniform sampler2D uNormalSampler;
+layout(set = 0, binding = 2) uniform sampler2D uDepthSampler;
+layout(set = 0, binding = 3) uniform sampler3D uGlobalSDF;
+layout(set = 0, binding = 4) uniform sampler3D uGlobalMipSDF;
+layout(set = 0, binding = 5) uniform UniformBufferObject
+{
+    GlobalSDFData data;
+    mat4 viewProjInv;
+    int step;
+    float dist;
+}ubo;
+
+void main()
+{
+
+    const ivec2 size          = textureSize(uDepthSampler, 0);
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+    const vec2  pixelCenter  = vec2(currentCoord) + vec2(0.5);
+    const vec2  texCoord     = pixelCenter / vec2(size);
+    float ao = 0.f;
+    float depth = texture(uDepthSampler,texCoord).r;
+    if (depth != 1.0f)
+    {
+        vec3 worldPos  = worldPositionFromDepth(texCoord,depth,ubo.viewProjInv);
+        vec3 normal    = octohedralToDirection(texture(uNormalSampler,texCoord).xy);
+        float minDis = 0.01;
+        for(int i = 0;i<ubo.step;i++)
+        {
+            vec3 rayOrigin = worldPos;
+            GlobalSDFTrace trace;
+            trace.worldPosition = rayOrigin;
+            trace.worldDirection = normal;
+            trace.minDistance = 0;
+            trace.maxDistance = (i + 1) * ubo.dist;
+            trace.stepScale = 1;
+            trace.needsHitNormal = false;
+            GlobalSDFHit hit = tracyGlobalSDF(ubo.data, uGlobalSDF, uGlobalMipSDF, trace, 0);
+            minDis = trace.maxDistance;
+            ao += max( (trace.maxDistance - hit.hitTime) / trace.maxDistance , 0);
+        }
+       imageStore(outColor, currentCoord, vec4(ao));
+    }
+}
