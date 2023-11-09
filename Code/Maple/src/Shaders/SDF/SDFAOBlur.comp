@@ -1,0 +1,31 @@
+//////////////////////////////////////////////////////////////////////////////
+// This file is part of the Maple Engine                              		//
+//////////////////////////////////////////////////////////////////////////////
+#version 450
+
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, r8) uniform image2D inputColor;
+layout(set = 0, binding = 1, r8) uniform image2D outColor;
+
+void main()
+{
+
+    const ivec2 currentCoord = ivec2(gl_GlobalInvocationID.xy);
+	const int blurRange = 2;
+	int n = 0;
+	float result = 0.0;
+	for (int x = -blurRange; x < blurRange; x++) 
+	{
+		for (int y = -blurRange; y < blurRange; y++) 
+		{
+			ivec2 offset = ivec2(x,y);
+			result += imageLoad(inputColor, currentCoord + offset).r;
+			n++;
+		}
+	}
+	float outC = result / (float(n));
+    imageStore(outColor, currentCoord, vec4(outC));
+}

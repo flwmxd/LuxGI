@@ -18,9 +18,10 @@ namespace maple::sdf::ao
 		{
 			Shader::Ptr shader;
 			DescriptorSet::Ptr sets;
-			Texture2D::Ptr outColor;
+			Texture2D::Ptr outColor[2];
 			int32_t step = 2;
 			float dist = 1.8;
+			float intensity = 1;
 		};
 	}
 

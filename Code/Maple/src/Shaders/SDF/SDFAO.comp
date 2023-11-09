@@ -63,7 +63,7 @@ void main()
             GlobalSDFTrace trace;
             trace.worldPosition = rayOrigin;
             //todo .should use better sampling method
-            trace.worldDirection = sampleHemisphereCos(normal, r);
+            trace.worldDirection = ubo.step == 1 ? normal : sampleHemisphereCos(normal, r);
             trace.minDistance = 0;
             trace.maxDistance = ubo.dist;
             trace.stepScale = 1;

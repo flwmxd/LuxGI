@@ -15,6 +15,15 @@
 
 namespace maple::sdf::ao
 {
+	namespace global::component 
+	{
+		struct DFAOBlur 
+		{
+			Shader::Ptr shader;
+			DescriptorSet::Ptr sets;
+		};
+	}
+
 	namespace render 
 	{
 		inline auto system(const sdf::global::component::GlobalDistanceFieldPublic& sdfPublic,
@@ -24,14 +33,15 @@ namespace maple::sdf::ao
 			const maple::global::component::Profiler& profiler,
 			global::component::DFAO& dfao)
 		{
-			if (dfao.outColor == nullptr) 
+			if (dfao.outColor[0] == nullptr)
 			{
-				dfao.outColor = Texture2D::create(winSize.width, winSize.height, nullptr, { TextureFormat::R8 });
+				dfao.outColor[0] = Texture2D::create(winSize.width, winSize.height, nullptr, { TextureFormat::R8 });
+				dfao.outColor[1] = Texture2D::create(winSize.width, winSize.height, nullptr, { TextureFormat::R8 });
 			}
 
 			dfao.sets->setTexture("uNormalSampler", renderData.gbuffer->getBuffer(GBufferTextures::NORMALS));
 			dfao.sets->setTexture("uDepthSampler", renderData.gbuffer->getDepthBuffer());
-			dfao.sets->setTexture("outColor", dfao.outColor);
+			dfao.sets->setTexture("outColor", dfao.outColor[0]);
 			dfao.sets->setTexture("uGlobalSDF", sdfPublic.texture);
 			dfao.sets->setTexture("uGlobalMipSDF", sdfPublic.mipTexture);
 			dfao.sets->setUniform("UniformBufferObject", "data", &sdfPublic.sdfCommonData);
@@ -50,7 +60,29 @@ namespace maple::sdf::ao
 		}
 	}
 
+	namespace dfao_blur
+	{
+		inline auto system(global::component::DFAOBlur& dfaoBlur,
+			const global::component::DFAO& dfao, 
+			const maple::component::RendererData& renderData)
+		{
+			if (dfao.outColor[0] == nullptr)
+				return;
+			dfaoBlur.sets->setTexture("inputColor", dfao.outColor[0]);
+			dfaoBlur.sets->setTexture("outColor", dfao.outColor[1]);
+			dfaoBlur.sets->update(renderData.commandBuffer);
 
+			auto commandBuffer = renderData.commandBuffer;
+
+			PipelineInfo pipeInfo;
+			pipeInfo.pipelineName = "DFAO-Blur";
+			pipeInfo.shader = dfaoBlur.shader;
+			auto pipeline = Pipeline::get(pipeInfo);
+			uint32_t dispatchGroupsX = static_cast<uint32_t>(ceil(float(dfao.outColor[1]->getWidth()) / float(8)));
+			uint32_t dispatchGroupsY = static_cast<uint32_t>(ceil(float(dfao.outColor[1]->getHeight()) / float(8)));
+			Renderer::dispatch(renderData.commandBuffer, dispatchGroupsX, dispatchGroupsY, 1, pipeline.get(), nullptr, { dfaoBlur.sets });
+		}
+	}        // namespace ssao_blur_pass
 	namespace on_imgui
 	{
 		inline auto system(global::component::DFAO& dfao)
@@ -74,7 +106,14 @@ namespace maple::sdf::ao
 			field.shader = Shader::create("shaders/SDF/SDFAO.shader");
 			field.sets = DescriptorSet::create({0,field.shader.get()});
 		});
+
+		builder->registerGlobalComponent<global::component::DFAOBlur>([](global::component::DFAOBlur& field) {
+			field.shader = Shader::create("shaders/SDF/SDFAOBlur.shader");
+			field.sets = DescriptorSet::create({ 0,field.shader.get() });
+		});
+
 		builder->registerWithinQueue<render::system>(render);
+		builder->registerWithinQueue<dfao_blur::system>(render);
 		builder->registerOnImGui<on_imgui::system>();
 	}
 }
