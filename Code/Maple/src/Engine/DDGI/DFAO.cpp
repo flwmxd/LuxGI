@@ -17,10 +17,11 @@ namespace maple::sdf::ao
 {
 	namespace render 
 	{
-		inline auto system(const sdf::global::component::GlobalDistanceFieldPublic& sdfPublic, 
+		inline auto system(const sdf::global::component::GlobalDistanceFieldPublic& sdfPublic,
 			const maple::component::RendererData& renderData,
 			const maple::component::CameraView& cameraView,
-			const maple::component::WindowSize& winSize, 
+			const maple::component::WindowSize& winSize,
+			const maple::global::component::Profiler& profiler,
 			global::component::DFAO& dfao)
 		{
 			if (dfao.outColor == nullptr) 
@@ -37,6 +38,8 @@ namespace maple::sdf::ao
 			dfao.sets->setUniform("UniformBufferObject", "viewProjInv", glm::value_ptr(glm::inverse(cameraView.projView)));
 			dfao.sets->setUniform("UniformBufferObject", "step", &dfao.step);
 			dfao.sets->setUniform("UniformBufferObject", "dist", &dfao.dist);
+			dfao.sets->setUniform("UniformBufferObject", "intensity", &dfao.intensity);
+			dfao.sets->setUniform("UniformBufferObject", "numFrames", &profiler.frameCount);
 
 			PipelineInfo info{};
 			info.shader = dfao.shader;
@@ -57,6 +60,7 @@ namespace maple::sdf::ao
 				ImGui::Columns(2);
 				ImGuiHelper::property("Steps", dfao.step, 0,20);
 				ImGuiHelper::property("Distant", dfao.dist, 0.f, 15.f);
+				ImGuiHelper::property("Intensity", dfao.intensity, 0.f, 10);
 				ImGui::Columns(1);
 			}
 			ImGui::End();

@@ -8,6 +8,7 @@
 
 #include "../Common/Light.glsl"
 #include "../Common/Math.glsl"
+#include "../Raytraced/Random.glsl"
 #include "../Raytraced/BlueNoise.glsl"
 #include "../SDF/AtlasCommon.glsl"
 #include "../SDF/SDFCommon.glsl"
@@ -24,9 +25,23 @@ layout(set = 0, binding = 5) uniform UniformBufferObject
 {
     GlobalSDFData data;
     mat4 viewProjInv;
-    int step;
     float dist;
+    float intensity;
+    int step;
+    int numFrames;
 }ubo;
+
+vec3 hemispherePointCos(float u, float v) {
+	float phi = v * 2 * PI;
+	float cosTheta = sqrt(1 - u);
+	float sinTheta = sqrt(1 - cosTheta * cosTheta);
+	return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+vec3 sampleHemisphereCos(in vec3 normal, inout Random rng)
+{
+	return normalize(makeRotationMatrix(normal) * hemispherePointCos(nextFloat(rng),nextFloat(rng)));
+}
 
 void main()
 {
@@ -39,23 +54,24 @@ void main()
     float depth = texture(uDepthSampler,texCoord).r;
     if (depth != 1.0f)
     {
+        Random r = randomInit(gl_GlobalInvocationID.xy, ubo.numFrames);
         vec3 worldPos  = worldPositionFromDepth(texCoord,depth,ubo.viewProjInv);
         vec3 normal    = octohedralToDirection(texture(uNormalSampler,texCoord).xy);
-        float minDis = 0.01;
         for(int i = 0;i<ubo.step;i++)
         {
             vec3 rayOrigin = worldPos;
             GlobalSDFTrace trace;
             trace.worldPosition = rayOrigin;
-            trace.worldDirection = normal;
+            //todo .should use better sampling method
+            trace.worldDirection = sampleHemisphereCos(normal, r);
             trace.minDistance = 0;
-            trace.maxDistance = (i + 1) * ubo.dist;
+            trace.maxDistance = ubo.dist;
             trace.stepScale = 1;
             trace.needsHitNormal = false;
-            GlobalSDFHit hit = tracyGlobalSDF(ubo.data, uGlobalSDF, uGlobalMipSDF, trace, 0);
-            minDis = trace.maxDistance;
-            ao += max( (trace.maxDistance - hit.hitTime) / trace.maxDistance , 0);
+            GlobalSDFHit hit = tracyGlobalSDF(ubo.data, uGlobalSDF, uGlobalMipSDF, trace, 0.01);
+            ao += max( (trace.maxDistance - hit.hitSDF * ubo.intensity) / trace.maxDistance , 0);
         }
-       imageStore(outColor, currentCoord, vec4(ao));
+        ao /= ubo.step;
+        imageStore(outColor, currentCoord, vec4(clamp(ao,0,1)));
     }
 }
