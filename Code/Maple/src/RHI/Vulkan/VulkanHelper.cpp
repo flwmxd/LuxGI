@@ -566,11 +566,13 @@ namespace maple
 
 	auto VulkanHelper::setObjectName(const std::string &name, uint64_t handle, VkObjectType objType) -> void
 	{
+#ifdef _DEBUG
 		if (name != "" && handle != 0)
 		{
 			VkDebugUtilsObjectNameInfoEXT s{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, objType, handle, name.c_str()};
 			vkSetDebugUtilsObjectNameEXT(*VulkanDevice::get(), &s);
 		}
+#endif
 	}
 
 	auto VulkanHelper::getSupportedDepthFormat(VkPhysicalDevice physicalDevice, VkFormat *depthFormat) -> VkBool32
