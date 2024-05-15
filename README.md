@@ -117,3 +117,7 @@ Also Paper Reference
 * [Spatiotemporal Variance-Guided Filtering](https://research.nvidia.com/publication/2017-07_spatiotemporal-variance-guided-filtering-real-time-reconstruction-path-traced) 
 
 * [Atrous](https://jo.dreggn.org/home/2010_atrous.pdf) 
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=flwmxd/LuxGI&type=Date)](https://star-history.com/#flwmxd/LuxGI&Date)
